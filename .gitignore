@@ -1,0 +1,6 @@
+.vscode/
+.west/
+zephyr/
+modules/
+build/
+bootloader/

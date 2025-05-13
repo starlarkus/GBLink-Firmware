@@ -1,0 +1,18 @@
+#include <zephyr/dt-bindings/pinctrl/stm32-pinctrl.h>
+
+&pinctrl {
+    gba_link_data_pa11: gba_link_data_pa11 {
+        pinmux = <STM32_PINMUX('A', 11, GPIO)>;
+        slew-rate = "high-speed";
+        bias-pull-up;
+    };
+};
+
+&dma1 { 
+    status = "okay";
+};
+
+&usb {
+    status = "okay";
+};
+

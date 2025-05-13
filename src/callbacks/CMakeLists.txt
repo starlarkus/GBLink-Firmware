@@ -1,0 +1,3 @@
+zephyr_library_sources(blockCommand.c)
+zephyr_library_sources(emptyCommand.c)
+zephyr_library_sources(moveCommand.c)

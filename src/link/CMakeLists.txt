@@ -1,0 +1,1 @@
+zephyr_library_sources(link_dma.c)
