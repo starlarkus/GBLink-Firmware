@@ -4,3 +4,4 @@ zephyr/
 modules/
 build/
 bootloader/
+tools/
