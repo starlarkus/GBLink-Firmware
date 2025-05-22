@@ -112,6 +112,7 @@ static void dma_complete_dummy(const struct device *dev, void *user_data, uint32
     (*(volatile uint32_t *)0x48000000) |= (1U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
     (*(volatile uint32_t *)(0x48000000 | 0x18)) = BSSR_SET;
 
+    dma_start(dma, DMA_CHANNEL_TX);
     LL_TIM_EnableCounter(TIM15);
 
     //gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
@@ -190,7 +191,6 @@ static void link_transiveDone()
     dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
     dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
     dma_start(dma, DMA_CHANNEL_RX);
-    dma_start(dma, DMA_CHANNEL_TX);
 }
 
 static void link_startReceiveUart(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins)
@@ -249,7 +249,7 @@ static int link_init()
     dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
     dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
     dma_start(dma, DMA_CHANNEL_RX);
-    dma_start(dma, DMA_CHANNEL_TX);
+    //dma_start(dma, DMA_CHANNEL_TX);
     return 0;
 }
 

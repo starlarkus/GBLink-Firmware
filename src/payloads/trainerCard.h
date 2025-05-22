@@ -28,7 +28,7 @@ struct TrainerCardRSE
 
 struct TrainerCard
 {
-    ///*0x00*/ struct TrainerCardRSE rse;
+    struct TrainerCardRSE rse;
     /*0x38*/ uint8_t version;
     /*0x3A*/ uint16_t hasAllFrontierSymbols;
     /*0x3C*/ uint32_t berryCrushPoints;

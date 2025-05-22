@@ -1,18 +1,15 @@
-#include "moveCommand.h"
-
+#include "readyExitStandbyCommand.h"
+#include "../link_defines.h"
 
 static uint8_t index = 0;
 
-uint16_t moveCommand_cb()
+uint16_t readyExitStandbyCommand_cb()
 {
     switch(index)
     {
         case 0:
             index++;
-            return 0xCAFE;
-        case 1:
-            index++;
-            return 0x13;
+            return LINKCMD_READY_EXIT_STANDBY;
         case 7:
             index = 0;
             return 0x00;
