@@ -165,11 +165,11 @@ static struct dma_config dma_cfg_rx = {
     .head_block = &rx_config
 };
 
-void link_setTransiveCallback(TransiveHandler cb) {
+void link_setTransiveCallback(TransiveHandler cb, void* user_data) {
     g_transiveCallback = cb;
 }
 
-void link_setTransiveDoneCallback(TransiveDoneHandler cb)
+void link_setTransiveDoneCallback(TransiveDoneHandler cb, void* user_data)
 {
     g_transiveDoneCallback = cb;
 }
