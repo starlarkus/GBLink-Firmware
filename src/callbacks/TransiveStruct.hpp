@@ -10,11 +10,11 @@ enum class CommandState
 
 struct TransiveStruct
 {
-    using InitCallback = void(*)(std::span<const uint8_t>);
+    using InitCallback = void(*)(std::span<const uint16_t>);
     using TransiveCallback = uint16_t(*)();
     using TransiveDoneCallback = CommandState(*)();
 
-    std::span<const uint8_t> userData;
+    std::span<const uint16_t> userData;
 
     InitCallback init;
     TransiveCallback transive;

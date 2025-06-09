@@ -4,7 +4,7 @@
 
 #pragma once
 
-class EnterTradeRoom
+class TradeSetup
 {
 
     enum class BlockCommandState : uint8_t
@@ -14,7 +14,7 @@ class EnterTradeRoom
     };
 
 public:
-    EnterTradeRoom(PacketLayer& layer) : m_packetLayer(layer)
+    TradeSetup(PacketLayer& layer) : m_packetLayer(layer)
     {}
 
     void process();
@@ -25,4 +25,7 @@ private:
     PacketLayer& m_packetLayer;
     struct k_sem m_commandSemaphore;
     std::array<uint16_t, 8> m_currentCommand;
+
+    size_t m_movementDataIndex = 0;
+    std::array<uint16_t, 6> m_movementData = {LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_RIGHT, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_LEFT, LINK_KEY_CODE_READY};
 };

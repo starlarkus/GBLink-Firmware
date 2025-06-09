@@ -2,12 +2,14 @@
 
 
 static uint8_t g_index = 0;
-static uint8_t g_move = 0x11;
+static size_t g_repeats = 0;
+static uint16_t g_move;
 
-void moveCommandInit(std::span<const uint8_t> data)
+void moveCommandInit(uint16_t data)
 {
     g_index = 0;
-    g_move = data[0];
+    g_repeats = 0;
+    g_move = data;
 }
 
 uint16_t moveCommandTransive()
@@ -33,9 +35,17 @@ TransiveStruct moveCommand()
 {
     static TransiveStruct transive
     {
-        .init = moveCommandInit,
+        .init = nullptr,
         .transive = moveCommandTransive,
-        .transiveDone = [](){ return CommandState::done; }
+        .transiveDone = []()
+        { 
+            if (g_repeats != 20)
+            {
+                g_repeats++;
+                return CommandState::resume;   
+            }
+            return CommandState::done; 
+        }
     };
 
     return transive;

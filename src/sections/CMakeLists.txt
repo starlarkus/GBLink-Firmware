@@ -1,1 +1,2 @@
-zephyr_library_sources(enterTraderoom.cpp)
+zephyr_library_sources(tradeSetup.cpp)
+zephyr_library_sources(tradeConnection.cpp)

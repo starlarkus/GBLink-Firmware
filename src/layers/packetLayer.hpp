@@ -31,10 +31,13 @@ public:
         link_setTransiveCallback(&transiveCallback, this);
         link_setTransiveDoneCallback(&transiveDoneCallback, this);
         k_sem_init(&m_commandRxCompleteSemaphore, 0, 1);
+        k_timer_init(&m_timeoutTimer, &packetTimeout, nullptr);
+        k_timer_user_data_set(&m_timeoutTimer, this);
     }
 
     void setTransiveHandler(struct TransiveStruct handler)
     {
+        if (!m_idle) return; 
         m_handler = handler;
         m_idle = false;
         if (handler.init != nullptr) handler.init(handler.userData);
@@ -42,13 +45,7 @@ public:
     
     std::span<const uint16_t, 8> getCommand() 
     { 
-        gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
-        gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
         k_sem_take(&m_commandRxCompleteSemaphore, K_FOREVER);
-        gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
-        gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
-        gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
-        gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
         return std::span(m_receivedCommand); 
     }
 
@@ -80,6 +77,7 @@ private:
     uint16_t crc(uint16_t rx_bytes)
     {
         m_state = TransiveState::command;
+        m_crcSendFinished = true;
         return rx_bytes;
     }
 
@@ -91,7 +89,7 @@ private:
         {
             m_commandIndex = 0;
             m_state = TransiveState::crc;
-            m_transiveDone = true;
+            m_commandSendFinished = true;
         }
 
         return (m_handler.transive != nullptr) ? m_handler.transive() : 0x00;
@@ -99,24 +97,32 @@ private:
 
     void onTransiveDone()
     {
-        if (!m_transiveDone) return;
-        m_transiveDone = false;
+        if (m_crcSendFinished)
+        {
+            m_crcSendFinished = false;
+            k_timer_start(&m_timeoutTimer, K_MSEC(14), K_NO_WAIT);
+        }
+        if (!m_commandSendFinished) return;
+        m_commandSendFinished = false;
         if (m_handler.transiveDone != nullptr)
         {
             if (m_handler.transiveDone() == CommandState::done)
             {
                 m_idle = true;
                 m_handler = emptyCommand();
+                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
+                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
             } 
         }
+        k_timer_stop(&m_timeoutTimer);
         k_sem_give(&m_commandRxCompleteSemaphore);
     }
 
 private:
     bool m_idle = true;
-    bool m_transiveDone = false;
+    bool m_commandSendFinished = false;
+    bool m_crcSendFinished = false;
 
-    int transiveDoneCounter = 0;
     struct k_sem m_commandRxCompleteSemaphore;
 
     int m_commandIndex = 0;
@@ -125,6 +131,8 @@ private:
     uint8_t m_transiveCounter = 0;
     TransiveStruct m_handler = emptyCommand();
     TransiveState m_state = TransiveState::handshake;
+
+    struct k_timer m_timeoutTimer;
 
     static uint16_t transiveCallback(uint16_t rxBytes, void* userData)
     {
@@ -136,5 +144,12 @@ private:
     {
         PacketLayer* self = static_cast<PacketLayer*>(userData);
         self->onTransiveDone();
+    }
+
+    static void packetTimeout(struct k_timer *timer)
+    {
+        void* userData = k_timer_user_data_get(timer);
+        PacketLayer* self = static_cast<PacketLayer*>(userData);
+        self->reset();
     }
 };

@@ -1,10 +1,11 @@
-#include "enterTraderoom.hpp"
+#include "tradeSetup.hpp"
 
 extern "C"
 {
-    #include "../payloads/linkPlayer.h"
     #include "../payloads/trainerCard.h"    
 }
+
+#include "../payloads/linkPlayer.hpp"
 
 #include "../callbacks/commands.hpp"
 
@@ -12,7 +13,7 @@ extern "C"
 
 #include <algorithm>
 
-void EnterTradeRoom::process()
+void TradeSetup::process()
 {
     while(true)
     {
@@ -51,8 +52,19 @@ void EnterTradeRoom::process()
                 break;
             
             case LINKCMD_SEND_HELD_KEYS:
+            {
+                if (!m_packetLayer.idle()) break;
+                
+                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
+                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
+
+                if (m_movementData[m_movementDataIndex] == LINK_KEY_CODE_READY) break;
+                
+                moveCommandInit(m_movementData[m_movementDataIndex]);
                 m_packetLayer.setTransiveHandler(moveCommand());
+                m_movementDataIndex++;
                 break;
+            }
             
             case LINKCMD_READY_CLOSE_LINK:
                 m_packetLayer.reset();
