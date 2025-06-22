@@ -18,20 +18,29 @@
 #define GPIO_PIN_LEADER_START 4
 #define GPIO_PIN_FOLLOWR_START 8
 #define GPIO_PIN_DATA_INPUT_OUTPUT 11
+#define GPIO_PIN_MASTER_SLAVE_INDICATOR 12
 #define BSSR_SET (1 << GPIO_PIN_DATA_INPUT_OUTPUT)
 #define BSSR_RESET (1 << (GPIO_PIN_DATA_INPUT_OUTPUT + 16))
 #define DMA_CHANNEL_RX 3
 #define DMA_CHANNEL_TX 5
 
-static struct gpio_callback g_link_start_rx_uart_callback;
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-void (*g_handler)(void);
+void* g_receiveUserData = NULL;
+static ReceiveHandler g_receiveCallback = NULL;
 
-void* g_transiveUserdata = NULL;
-static TransiveHandler g_transiveCallback = NULL;
+void* g_transmitUserData = NULL;
+static TransmitHandler g_transmitCallback = NULL;
 
 void* g_transiveDoneUserdata = NULL;
 static TransiveDoneHandler g_transiveDoneCallback = NULL;
+
+static enum LinkMode g_mode = SLAVE;
+
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+static struct gpio_callback g_linkStartReceiveSlaveCallback;
+static struct gpio_callback g_linkStartReceiveMasterCallback;
 
 const struct device* gpioIO = DEVICE_DT_GET(DT_NODELABEL(gpioa));
 const struct device* dma = DEVICE_DT_GET(DT_NODELABEL(dma1));
@@ -39,89 +48,62 @@ const struct device* dma = DEVICE_DT_GET(DT_NODELABEL(dma1));
 static uint32_t tx_data[18] = {};
 static uint32_t rx_data[17] = {};
 
-static uint16_t g_link_received = 0;
-static uint16_t g_link_transmit = 0;
+static uint16_t g_linkReceived = 0;
+static uint16_t g_linkTransmit = 0;
+
 static const uint32_t mask = 1 << GPIO_PIN_DATA_INPUT_OUTPUT;
 
-static uint16_t dummy_transmit(uint16_t)
-{
-    return 0x00;
-}
-
-static void dma_complete(const struct device *dev, void *user_data, uint32_t channel,
-    int status)
-{
-    if (g_handler != NULL) g_handler();
-}
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+// DMA
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
 static inline void link_transmitToDma()
 {
-    tx_data[1] = (g_link_transmit & (1 << 0))  ? BSSR_SET : BSSR_RESET;
-    tx_data[2] = (g_link_transmit & (1 << 1))  ? BSSR_SET : BSSR_RESET;
-    tx_data[3] = (g_link_transmit & (1 << 2))  ? BSSR_SET : BSSR_RESET;
-    tx_data[4] = (g_link_transmit & (1 << 3))  ? BSSR_SET : BSSR_RESET;
-    tx_data[5] = (g_link_transmit & (1 << 4))  ? BSSR_SET : BSSR_RESET;
-    tx_data[6] = (g_link_transmit & (1 << 5))  ? BSSR_SET : BSSR_RESET;
-    tx_data[7] = (g_link_transmit & (1 << 6))  ? BSSR_SET : BSSR_RESET;
-    tx_data[8] = (g_link_transmit & (1 << 7))  ? BSSR_SET : BSSR_RESET;
-    tx_data[9] = (g_link_transmit & (1 << 8))  ? BSSR_SET : BSSR_RESET;
-    tx_data[10] = (g_link_transmit & (1 << 9))  ? BSSR_SET : BSSR_RESET;
-    tx_data[11] = (g_link_transmit & (1 << 10)) ? BSSR_SET : BSSR_RESET;
-    tx_data[12] = (g_link_transmit & (1 << 11)) ? BSSR_SET : BSSR_RESET;
-    tx_data[13] = (g_link_transmit & (1 << 12)) ? BSSR_SET : BSSR_RESET;
-    tx_data[14] = (g_link_transmit & (1 << 13)) ? BSSR_SET : BSSR_RESET;
-    tx_data[15] = (g_link_transmit & (1 << 14)) ? BSSR_SET : BSSR_RESET;
-    tx_data[16] = (g_link_transmit & (1 << 15)) ? BSSR_SET : BSSR_RESET;
+    tx_data[1] = (g_linkTransmit & (1 << 0))  ? BSSR_SET : BSSR_RESET;
+    tx_data[2] = (g_linkTransmit & (1 << 1))  ? BSSR_SET : BSSR_RESET;
+    tx_data[3] = (g_linkTransmit & (1 << 2))  ? BSSR_SET : BSSR_RESET;
+    tx_data[4] = (g_linkTransmit & (1 << 3))  ? BSSR_SET : BSSR_RESET;
+    tx_data[5] = (g_linkTransmit & (1 << 4))  ? BSSR_SET : BSSR_RESET;
+    tx_data[6] = (g_linkTransmit & (1 << 5))  ? BSSR_SET : BSSR_RESET;
+    tx_data[7] = (g_linkTransmit & (1 << 6))  ? BSSR_SET : BSSR_RESET;
+    tx_data[8] = (g_linkTransmit & (1 << 7))  ? BSSR_SET : BSSR_RESET;
+    tx_data[9] = (g_linkTransmit & (1 << 8))  ? BSSR_SET : BSSR_RESET;
+    tx_data[10] = (g_linkTransmit & (1 << 9))  ? BSSR_SET : BSSR_RESET;
+    tx_data[11] = (g_linkTransmit & (1 << 10)) ? BSSR_SET : BSSR_RESET;
+    tx_data[12] = (g_linkTransmit & (1 << 11)) ? BSSR_SET : BSSR_RESET;
+    tx_data[13] = (g_linkTransmit & (1 << 12)) ? BSSR_SET : BSSR_RESET;
+    tx_data[14] = (g_linkTransmit & (1 << 13)) ? BSSR_SET : BSSR_RESET;
+    tx_data[15] = (g_linkTransmit & (1 << 14)) ? BSSR_SET : BSSR_RESET;
+    tx_data[16] = (g_linkTransmit & (1 << 15)) ? BSSR_SET : BSSR_RESET;
 }
 
 static inline void link_dmaToReceived()
 {
-    if (rx_data[1] & mask) g_link_received |= (1 << 0);
-    if (rx_data[2] & mask) g_link_received |= (1 << 1);
-    if (rx_data[3] & mask) g_link_received |= (1 << 2);
-    if (rx_data[4] & mask) g_link_received |= (1 << 3);
+    if (rx_data[1] & mask) g_linkReceived |= (1 << 0);
+    if (rx_data[2] & mask) g_linkReceived |= (1 << 1);
+    if (rx_data[3] & mask) g_linkReceived |= (1 << 2);
+    if (rx_data[4] & mask) g_linkReceived |= (1 << 3);
 
-    if (rx_data[5] & mask) g_link_received |= (1 << 4);
-    if (rx_data[6] & mask) g_link_received |= (1 << 5);
-    if (rx_data[7] & mask) g_link_received |= (1 << 6);
-    if (rx_data[8] & mask) g_link_received |= (1 << 7);
+    if (rx_data[5] & mask) g_linkReceived |= (1 << 4);
+    if (rx_data[6] & mask) g_linkReceived |= (1 << 5);
+    if (rx_data[7] & mask) g_linkReceived |= (1 << 6);
+    if (rx_data[8] & mask) g_linkReceived |= (1 << 7);
 
-    if (rx_data[9] & mask) g_link_received |= (1 << 8);
-    if (rx_data[10] & mask) g_link_received |= (1 << 9);
-    if (rx_data[11] & mask) g_link_received |= (1 << 10);
-    if (rx_data[12] & mask) g_link_received |= (1 << 11);
+    if (rx_data[9] & mask) g_linkReceived |= (1 << 8);
+    if (rx_data[10] & mask) g_linkReceived |= (1 << 9);
+    if (rx_data[11] & mask) g_linkReceived |= (1 << 10);
+    if (rx_data[12] & mask) g_linkReceived |= (1 << 11);
 
-    if (rx_data[13] & mask) g_link_received |= (1 << 12);
-    if (rx_data[14] & mask) g_link_received |= (1 << 13);
-    if (rx_data[15] & mask) g_link_received |= (1 << 14);
-    if (rx_data[16] & mask) g_link_received |= (1 << 15);
+    if (rx_data[13] & mask) g_linkReceived |= (1 << 12);
+    if (rx_data[14] & mask) g_linkReceived |= (1 << 13);
+    if (rx_data[15] & mask) g_linkReceived |= (1 << 14);
+    if (rx_data[16] & mask) g_linkReceived |= (1 << 15);
 }
 
-static void dma_complete_dummy(const struct device *dev, void *user_data, uint32_t channel,
-    int status)
-{
-    int lock = irq_lock();
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-    //gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
-    //(*(volatile uint32_t *)(0x48000000 | 0x18)) = (1 << (GPIO_PIN_DEBUG + 16));
-
-    link_dmaToReceived();
-    g_link_transmit = g_transiveCallback(g_link_received, g_transiveUserdata);
-    link_transmitToDma();
-
-    //gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_OUTPUT_HIGH);
-    (*(volatile uint32_t *)0x48000000) &= ~(3U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
-    (*(volatile uint32_t *)0x48000000) |= (1U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
-    (*(volatile uint32_t *)(0x48000000 | 0x18)) = BSSR_SET;
-
-    dma_start(dma, DMA_CHANNEL_TX);
-    LL_TIM_EnableCounter(TIM15);
-
-    //gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
-    //(*(volatile uint32_t *)(0x48000000 | 0x18)) = (1 << GPIO_PIN_DEBUG);
-
-    irq_unlock(lock);
-}
+static void dmaCompleteTransmit(const struct device *dev, void *user_data, uint32_t channel, int status);
+static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32_t channel, int status);
 
 static struct dma_block_config tx_config = {
     .dest_address = (uint32_t)(0x48000000 | 0x18), // GPIOA->BSRR
@@ -141,7 +123,7 @@ static struct dma_config dma_cfg_tx = {
     .dest_burst_length = 1,
     .block_count = 1,
     .channel_priority = 0x03,
-    .dma_callback = &dma_complete,
+    .dma_callback = &dmaCompleteTransmit,
     .head_block = &tx_config
 };
 
@@ -163,14 +145,103 @@ static struct dma_config dma_cfg_rx = {
     .dest_burst_length = 1,
     .block_count = 1,
     .channel_priority = 0x00,
-    .dma_callback = dma_complete_dummy,
+    .dma_callback = dmaCompleteReceive,
     .head_block = &rx_config
 };
 
-void link_setTransiveCallback(TransiveHandler cb, void* user_data) 
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+static void dmaCompleteTransmit(const struct device *dev, void *user_data, uint32_t channel, int status)
 {
-    g_transiveUserdata = user_data;
-    g_transiveCallback = cb;
+    g_linkReceived = 0;
+
+    switch (g_mode)
+    {
+        case SLAVE:
+            LL_TIM_DisableCounter(TIM15);
+            LL_TIM_SetCounter(TIM15, 0);
+
+            LL_TIM_DisableCounter(TIM3);
+            LL_TIM_SetCounter(TIM3, 0);
+
+            if (g_transiveDoneCallback != NULL) g_transiveDoneCallback(g_transiveDoneUserdata);
+
+            // Prepare state for next recive
+            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
+            dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
+            dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
+            dma_start(dma, DMA_CHANNEL_RX);
+            break;
+
+        case MASTER:
+            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT);
+            gpio_pin_set(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_ACTIVE_HIGH);
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_EDGE_FALLING);
+            break;
+    }
+}
+
+static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32_t channel, int status)
+{
+    int lock = irq_lock();
+
+    link_dmaToReceived();
+    if (g_receiveCallback != NULL) g_receiveCallback(g_linkReceived, g_receiveUserData);
+
+    switch (g_mode)
+    {
+        case SLAVE:
+
+            if (g_receiveCallback != NULL) g_linkTransmit = g_transmitCallback(g_transmitUserData);
+            link_transmitToDma();
+
+            //configure data gpio to output, but fast
+            (*(volatile uint32_t *)0x48000000) &= ~(3U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
+            (*(volatile uint32_t *)0x48000000) |= (1U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
+            (*(volatile uint32_t *)(0x48000000 | 0x18)) = BSSR_SET;
+
+            dma_start(dma, DMA_CHANNEL_TX);
+            LL_TIM_EnableCounter(TIM15);
+            break;
+            
+        case MASTER:
+
+            LL_TIM_DisableCounter(TIM15);
+            LL_TIM_SetCounter(TIM15, 0);
+
+            LL_TIM_DisableCounter(TIM3);
+            LL_TIM_SetCounter(TIM3, 0);
+
+            if (g_transiveDoneCallback != NULL) g_transiveDoneCallback(g_transiveDoneUserdata);
+
+            // Prepare state for next recive
+            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT);
+            dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
+            dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
+            dma_start(dma, DMA_CHANNEL_RX);
+            dma_start(dma, DMA_CHANNEL_TX);
+
+            gpio_pin_set(gpioIO, GPIO_PIN_LEADER_START, GPIO_ACTIVE_LOW);
+            gpio_pin_set(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_ACTIVE_LOW);
+            break;
+    }
+    irq_unlock(lock);
+}
+
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+// Interface
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+void link_setTransmitCallback(TransmitHandler cb, void* userData) 
+{
+    g_transmitUserData = userData;
+    g_transmitCallback = cb;
+}
+
+void link_setReceiveCallback(ReceiveHandler cb, void* userData) 
+{
+    g_receiveUserData = userData;
+    g_receiveCallback = cb;
 }
 
 void link_setTransiveDoneCallback(TransiveDoneHandler cb, void* user_data)
@@ -179,31 +250,42 @@ void link_setTransiveDoneCallback(TransiveDoneHandler cb, void* user_data)
     g_transiveDoneCallback = cb;
 }
 
-static void link_transiveDone()
-{   
-    g_link_received = 0;
-    
-    LL_TIM_DisableCounter(TIM15);
-    LL_TIM_SetCounter(TIM15, 0);
-
-    LL_TIM_DisableCounter(TIM3);
-    LL_TIM_SetCounter(TIM3, 0);
-
-    if (g_transiveDoneCallback != NULL) g_transiveDoneCallback(g_transiveDoneUserdata);
-
-    // Prepare state for next recive
-    gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
-    dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
-    dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
-    dma_start(dma, DMA_CHANNEL_RX);
+enum LinkMode link_getMode()
+{
+    return g_mode;
 }
 
-static void link_startReceiveUart(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins)
+//-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+void vBlankInterrupt()
+{
+    if (LL_TIM_IsActiveFlag_UPDATE(TIM16)) LL_TIM_ClearFlag_UPDATE(TIM16);
+    if (g_mode != MASTER) return;
+
+    g_linkTransmit = g_transmitCallback(g_transmitUserData);
+
+    
+    link_transmitToDma();
+    dma_start(dma, DMA_CHANNEL_TX);
+
+    gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_OUTPUT_LOW);
+    gpio_pin_set(gpioIO, GPIO_PIN_LEADER_START, GPIO_ACTIVE_HIGH);
+
+    LL_TIM_EnableCounter(TIM15);
+}
+
+static void startReceiveSlave(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins)
 {
     LL_TIM_EnableCounter(TIM3);
 }
 
-static void link_set_up_timer()
+static void startReceiveMaster(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins)
+{
+    LL_TIM_EnableCounter(TIM3);
+    gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
+}
+
+static void setUpDMATimer()
 {
     LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_TIM15);
     LL_TIM_SetClockSource(TIM15, LL_TIM_CLOCKSOURCE_INTERNAL);
@@ -232,29 +314,81 @@ static void link_set_up_timer()
     LL_TIM_SetTriggerOutput(TIM3, LL_TIM_TRGO_UPDATE);
 }
 
+void setUpVBlankTimer()
+{
+    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_TIM16);
+    LL_TIM_SetClockSource(TIM16, LL_TIM_CLOCKSOURCE_INTERNAL);
+    LL_TIM_SetCounterMode(TIM16, LL_TIM_COUNTERDIRECTION_UP);
+    LL_TIM_SetUpdateSource(TIM16, LL_TIM_UPDATESOURCE_COUNTER);
+    LL_TIM_SetAutoReload(TIM16, 49719);
+    LL_TIM_SetCounter(TIM16, 0);
+    LL_TIM_SetPrescaler(TIM16, 15);
+    LL_TIM_EnableIT_UPDATE(TIM16);
+    LL_TIM_GenerateEvent_UPDATE(TIM16);
+    NVIC_SetPriority(TIM16_IRQn, 0);
+    NVIC_EnableIRQ(TIM16_IRQn);
+    IRQ_CONNECT(TIM16_IRQn, 0, vBlankInterrupt, NULL, 0);
+    LL_TIM_EnableCounter(TIM16);
+}
+
+void link_changeMode(enum LinkMode mode)
+{
+    if (g_mode == mode) return;
+    
+    switch (mode)
+    {
+        case SLAVE:
+            gpio_pin_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_configure(gpioIO, GPIO_PIN_FOLLOWR_START, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_configure(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_OUTPUT_LOW);
+
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_EDGE_FALLING);
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
+            LL_TIM_DisableCounter(TIM16);
+            break;
+
+        case MASTER:
+
+            gpio_pin_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_OUTPUT_HIGH);
+            gpio_pin_configure(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_OUTPUT_HIGH);
+            gpio_pin_configure(gpioIO, GPIO_PIN_FOLLOWR_START, GPIO_OUTPUT_HIGH);
+            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT);
+
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_DISABLE);
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
+
+            setUpVBlankTimer();
+            break;
+    }
+
+    g_mode = mode;
+}
+
 static int link_init()
 {
     tx_data[0] = BSSR_RESET;
     tx_data[17] = BSSR_SET;
 
-    g_handler = link_transiveDone;
-    g_transiveCallback = &dummy_transmit;
-
     gpio_pin_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INPUT | GPIO_PULL_UP);
     gpio_pin_configure(gpioIO, GPIO_PIN_FOLLOWR_START, GPIO_INPUT | GPIO_PULL_UP);
     gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
+    gpio_pin_configure(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_OUTPUT_LOW);
 
     gpio_pin_configure(gpioIO, GPIO_PIN_DEBUG, GPIO_OUTPUT_HIGH);
-    link_set_up_timer();
+    setUpDMATimer();
 
-    gpio_init_callback(&g_link_start_rx_uart_callback, link_startReceiveUart, (1 << GPIO_PIN_LEADER_START));
-    gpio_add_callback(gpioIO, &g_link_start_rx_uart_callback);
+    gpio_init_callback(&g_linkStartReceiveSlaveCallback, startReceiveSlave, (1 << GPIO_PIN_LEADER_START));
+    gpio_add_callback(gpioIO, &g_linkStartReceiveSlaveCallback);
     gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_EDGE_FALLING);
+
+    gpio_init_callback(&g_linkStartReceiveMasterCallback, startReceiveMaster, (1 << GPIO_PIN_DATA_INPUT_OUTPUT));
+    gpio_add_callback(gpioIO, &g_linkStartReceiveMasterCallback);
+    gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
 
     dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
     dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
     dma_start(dma, DMA_CHANNEL_RX);
-    //dma_start(dma, DMA_CHANNEL_TX);
     return 0;
 }
 

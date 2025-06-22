@@ -1,5 +1,7 @@
 #include <zephyr/kernel.h>
 
+#pragma once
+
 struct LinkPlayer
 {
     /* 0x00 */ uint16_t version;

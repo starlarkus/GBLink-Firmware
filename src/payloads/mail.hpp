@@ -1,6 +1,8 @@
 #include <zephyr/kernel.h>
 #include <span>
 
+#pragma once
+
 struct Mail
 {
     /*0x00*/ uint16_t words[9] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};

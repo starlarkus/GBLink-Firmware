@@ -1,9 +1,21 @@
 #include <zephyr/kernel.h>
 
-typedef uint16_t (*TransiveHandler)(uint16_t rx, void* user_data);
+enum LinkMode
+{
+    MASTER,
+    SLAVE
+};
 
-typedef void (*TransiveDoneHandler)(void* user_data);
+typedef void (*ReceiveHandler)(uint16_t rx, void* userData);
+typedef uint16_t (*TransmitHandler)(void* userData);
+typedef void (*TransiveDoneHandler)(void* userData);
 
-void link_setTransiveCallback(TransiveHandler cb, void* user_data);
+void link_setTransmitCallback(TransmitHandler cb, void* userData);
 
-void link_setTransiveDoneCallback(TransiveDoneHandler cb, void* user_data);
+void link_setReceiveCallback(ReceiveHandler cb, void* userData);
+
+void link_setTransiveDoneCallback(TransiveDoneHandler cb, void* userData);
+
+enum LinkMode link_getMode();
+
+void link_changeMode(enum LinkMode mode);

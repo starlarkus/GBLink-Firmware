@@ -28,14 +28,18 @@ int main(void)
                 {
                     case LINKTYPE_TRADE_SETUP:
                         g_tradeSetup.process();
-                        break;
-                    
-                    case LINKTYPE_TRADE_CONNECTING:
-                        g_tradeConnection.process();
-                        break;
+                        g_packetLayer.changeLinkLayerDirection();
+                        g_tradeConnection.process(); // connection section is master mode
+                        g_packetLayer.changeLinkLayerDirection();
 
                     case LINKTYPE_TRADE_DISCONNECTED:
                         g_tradeDisconnect.process();
+                        g_packetLayer.changeLinkLayerDirection();
+                        g_tradeConnection.process(); // connection section is master mode
+                        g_packetLayer.changeLinkLayerDirection();
+                        break;
+                    
+                    case LINKTYPE_TRADE:
                         break;
                 }
                 break;

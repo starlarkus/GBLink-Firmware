@@ -28,8 +28,10 @@ private:
 public:
     PacketLayer()
     {
-        link_setTransiveCallback(&transiveCallback, this);
+        link_setTransmitCallback(&transmitCallback, this);
+        link_setReceiveCallback(&receiveCallback, this);
         link_setTransiveDoneCallback(&transiveDoneCallback, this);
+        
         k_sem_init(&m_commandRxCompleteSemaphore, 0, 1);
         k_timer_init(&m_timeoutTimer, &packetTimeout, nullptr);
         k_timer_user_data_set(&m_timeoutTimer, this);
@@ -53,100 +55,170 @@ public:
     { 
         m_state = TransiveState::handshake;
         m_idle = true;
-        m_commandSendFinished = false;
-        m_crcSendFinished = false;
         m_commandIndex = 0;
-        m_transiveCounter = 0;
+        m_receivedHandshake = 0x00;
+        m_transmitHandShake = LINK_SLAVE_HANDSHAKE;
+        m_handshakeCount = 0;
+        m_crc = LINK_SLAVE_HANDSHAKE;
         m_handler = emptyCommand();
     }
 
     bool idle() { return m_idle; }
 
+    void changeLinkLayerDirection() 
+    {   
+        enum LinkMode mode = SLAVE;
+        if (link_getMode() == mode) mode = MASTER;
+        link_changeMode(mode); 
+    }
+
 private:
-    uint16_t onTransive(uint16_t rxBytes)
+
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+    void onReceive(uint16_t rxBytes)
     {
         switch(m_state)
         {
-            case TransiveState::crc: return crc(rxBytes);
-            case TransiveState::command: return command(rxBytes);
-            case TransiveState::handshake: return handshake(rxBytes);
+            case TransiveState::crc: return receiveCrc(rxBytes);
+            case TransiveState::command: return receiveCommand(rxBytes);
+            case TransiveState::handshake: return receiveHandshake(rxBytes);
+            default: return;
+        };
+    }
+
+    uint16_t onTransmit()
+    {
+        switch(m_state)
+        {
+            case TransiveState::crc: return transmitCrc();
+            case TransiveState::command: return transmitCommand();
+            case TransiveState::handshake: return transmitHandshake();
             default: return 0x00;
         };
     }
 
-    uint16_t handshake(uint16_t rx_bytes)
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+    void receiveHandshake(uint16_t rxBytes)
     {
-        if (rx_bytes == LINK_MASTER_HANDSHAKE) 
+        m_receivedHandshake = rxBytes;
+    }
+
+    uint16_t transmitHandshake()
+    {
+        if (link_getMode() == MASTER)
         {
-            m_state = TransiveState::crc;
+            m_handshakeCount++;
         }
-        return LINK_SLAVE_HANDSHAKE;
+        if (m_handshakeCount >= 200)
+        {
+            m_handshakeCount = 0;
+            m_transmitHandShake = LINK_MASTER_HANDSHAKE;
+        }
+        return m_transmitHandShake;
     }
 
-    uint16_t crc(uint16_t rx_bytes)
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+    void receiveCrc(uint16_t rxBytes)
     {
-        m_state = TransiveState::command;
-        m_crcSendFinished = true;
-        return rx_bytes;
+        // don't care
     }
 
-    uint16_t command(uint16_t rxBytes)
+    uint16_t transmitCrc()
+    {
+        return m_crc;
+    }
+
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+    void receiveCommand(uint16_t rxBytes)
     {
         m_receivedCommand[m_commandIndex] = rxBytes;
+        m_crc += rxBytes;
         m_commandIndex++;
-        if (m_commandIndex == 8)
-        {
-            m_commandIndex = 0;
-            m_state = TransiveState::crc;
-            m_commandSendFinished = true;
-        }
-
-        return (m_handler.transive != nullptr) ? m_handler.transive() : 0x00;
     }
+
+    uint16_t transmitCommand()
+    {
+        uint16_t m_transmittedBytes = (m_handler.transive != nullptr) ? m_handler.transive() : 0x00;
+        m_crc += m_transmittedBytes;
+        return m_transmittedBytes;
+    }
+
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
     void onTransiveDone()
     {
-        if (m_crcSendFinished)
+        switch (m_state)
         {
-            m_crcSendFinished = false;
-            k_timer_start(&m_timeoutTimer, K_MSEC(14), K_NO_WAIT);
+            case TransiveState::handshake:
+                if (m_receivedHandshake == LINK_MASTER_HANDSHAKE 
+                    || m_transmitHandShake == LINK_MASTER_HANDSHAKE)
+                {
+                    m_state = TransiveState::crc;
+                }
+                break;
+
+            case TransiveState::crc:
+                k_timer_start(&m_timeoutTimer, K_MSEC(14), K_NO_WAIT);
+                m_state = TransiveState::command;
+                m_crc = 0x00;
+                break;
+
+            case TransiveState::command:
+                
+                if (m_commandIndex != 8) return;
+
+                m_commandIndex = 0;
+                m_state = TransiveState::crc;
+                k_timer_stop(&m_timeoutTimer);
+                k_sem_give(&m_commandRxCompleteSemaphore);
+                
+                if (m_handler.transiveDone != nullptr && m_handler.transiveDone() == CommandState::done)
+                {
+                    m_idle = true;
+                    m_handler = emptyCommand();
+                }
+                break;
+            
+            default: break;
         }
-        if (!m_commandSendFinished) return;
-        m_commandSendFinished = false;
-        if (m_handler.transiveDone != nullptr)
-        {
-            if (m_handler.transiveDone() == CommandState::done)
-            {
-                m_idle = true;
-                m_handler = emptyCommand();
-                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
-                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
-            } 
-        }
-        k_timer_stop(&m_timeoutTimer);
-        k_sem_give(&m_commandRxCompleteSemaphore);
     }
 
 private:
     bool m_idle = true;
-    bool m_commandSendFinished = false;
-    bool m_crcSendFinished = false;
+
+    uint16_t m_handshakeCount = 0;
+    uint16_t m_receivedHandshake = LINK_SLAVE_HANDSHAKE;
+    uint16_t m_transmitHandShake = LINK_SLAVE_HANDSHAKE;
+    uint16_t m_crc = LINK_SLAVE_HANDSHAKE; //first crc is always handshake
 
     struct k_sem m_commandRxCompleteSemaphore;
 
     int m_commandIndex = 0;
     std::array<uint16_t, 8> m_receivedCommand = {};
 
-    uint8_t m_transiveCounter = 0;
     TransiveStruct m_handler = emptyCommand();
     TransiveState m_state = TransiveState::handshake;
 
     struct k_timer m_timeoutTimer;
 
-    static uint16_t transiveCallback(uint16_t rxBytes, void* userData)
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+    // Callbacks
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
+
+    static void receiveCallback(uint16_t rxBytes, void* userData)
     {
         PacketLayer* self = static_cast<PacketLayer*>(userData);
-        return self->onTransive(rxBytes);
+        return self->onReceive(rxBytes);
+    }
+
+    static uint16_t transmitCallback(void* userData)
+    {
+        PacketLayer* self = static_cast<PacketLayer*>(userData);
+        return self->onTransmit();
     }
 
     static void transiveDoneCallback(void* userData)

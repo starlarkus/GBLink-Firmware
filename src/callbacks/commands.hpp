@@ -4,3 +4,4 @@
 #include "./blockRequestCommand.hpp"
 #include "./readyExitStandbyCommand.hpp"
 #include "./readyCloseLinkCommand.hpp"
+#include "./sendLinkTypeCommand.hpp"

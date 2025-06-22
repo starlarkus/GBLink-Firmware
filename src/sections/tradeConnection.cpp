@@ -11,9 +11,12 @@
 void TradeConnection::handleInitialDataExchange()
 {
    
-    while(true)
+    m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE_CONNECTING));
+
+    while (true)
     {
         auto command = m_packetLayer.getCommand();
+
         switch(command[0])
         {
             case LINKCMD_INIT_BLOCK:
@@ -117,6 +120,7 @@ void TradeConnection::handleTradeNegotiations()
                 
             case LINKCMD_READY_CLOSE_LINK:
                 m_packetLayer.setTransiveHandler(readyCloseLinkCommand());
+                while(!m_packetLayer.idle()) {};
                 return;
             
             default: break;

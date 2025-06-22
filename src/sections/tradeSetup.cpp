@@ -65,6 +65,8 @@ void TradeSetup::process()
             
             case LINKCMD_READY_CLOSE_LINK:
                 m_packetLayer.setTransiveHandler(readyCloseLinkCommand());
+                while(!m_packetLayer.idle()) {};
+                k_sleep(K_MSEC(200));
                 return;
             
             default: break;
