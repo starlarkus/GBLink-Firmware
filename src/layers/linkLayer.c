@@ -257,13 +257,12 @@ enum LinkMode link_getMode()
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-void vBlankInterrupt()
+void link_startTransive()
 {
     if (LL_TIM_IsActiveFlag_UPDATE(TIM16)) LL_TIM_ClearFlag_UPDATE(TIM16);
     if (g_mode != MASTER) return;
 
     g_linkTransmit = g_transmitCallback(g_transmitUserData);
-
     
     link_transmitToDma();
     dma_start(dma, DMA_CHANNEL_TX);
@@ -314,23 +313,6 @@ static void setUpDMATimer()
     LL_TIM_SetTriggerOutput(TIM3, LL_TIM_TRGO_UPDATE);
 }
 
-void setUpVBlankTimer()
-{
-    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_TIM16);
-    LL_TIM_SetClockSource(TIM16, LL_TIM_CLOCKSOURCE_INTERNAL);
-    LL_TIM_SetCounterMode(TIM16, LL_TIM_COUNTERDIRECTION_UP);
-    LL_TIM_SetUpdateSource(TIM16, LL_TIM_UPDATESOURCE_COUNTER);
-    LL_TIM_SetAutoReload(TIM16, 49719);
-    LL_TIM_SetCounter(TIM16, 0);
-    LL_TIM_SetPrescaler(TIM16, 15);
-    LL_TIM_EnableIT_UPDATE(TIM16);
-    LL_TIM_GenerateEvent_UPDATE(TIM16);
-    NVIC_SetPriority(TIM16_IRQn, 0);
-    NVIC_EnableIRQ(TIM16_IRQn);
-    IRQ_CONNECT(TIM16_IRQn, 0, vBlankInterrupt, NULL, 0);
-    LL_TIM_EnableCounter(TIM16);
-}
-
 void link_changeMode(enum LinkMode mode)
 {
     if (g_mode == mode) return;
@@ -358,7 +340,7 @@ void link_changeMode(enum LinkMode mode)
             gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_DISABLE);
             gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
 
-            setUpVBlankTimer();
+            //setUpVBlankTimer();
             break;
     }
 

@@ -5,17 +5,23 @@ extern "C"
 }
 
 #include "../callbacks/commands.hpp"
-
 #include "../link_defines.h"
+#include "masterClock.hpp"
 
 #include <span>
-
 #include <zephyr/drivers/gpio.h>
 
 #pragma once
 
 class PacketLayer
 {
+public:
+    enum class Mode
+    {
+        master,
+        slave
+    };
+
 private:
 
     enum class TransiveState
@@ -51,25 +57,26 @@ public:
         return std::span(m_receivedCommand); 
     }
 
-    void reset() 
-    { 
-        m_state = TransiveState::handshake;
-        m_idle = true;
-        m_commandIndex = 0;
-        m_receivedHandshake = 0x00;
-        m_transmitHandShake = LINK_SLAVE_HANDSHAKE;
-        m_handshakeCount = 0;
-        m_crc = LINK_SLAVE_HANDSHAKE;
-        m_handler = emptyCommand();
-    }
-
     bool idle() { return m_idle; }
 
-    void changeLinkLayerDirection() 
+    void reset();
+
+    void setMode(Mode mode) 
     {   
-        enum LinkMode mode = SLAVE;
-        if (link_getMode() == mode) mode = MASTER;
-        link_changeMode(mode); 
+        switch (mode)
+        {
+            case Mode::master:
+                if (link_getMode() != MASTER) link_changeMode(MASTER);
+                m_masterClock.enableSync();
+                break;
+            
+            case Mode::slave:
+                if (link_getMode() != SLAVE) link_changeMode(SLAVE);
+                m_masterClock.disableSync();
+                break;
+        }
+
+        g_mode = mode;
     }
 
 private:
@@ -107,7 +114,7 @@ private:
 
     uint16_t transmitHandshake()
     {
-        if (link_getMode() == MASTER)
+        if (g_mode == Mode::master && m_receivedHandshake == LINK_SLAVE_HANDSHAKE)
         {
             m_handshakeCount++;
         }
@@ -149,46 +156,13 @@ private:
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-    void onTransiveDone()
-    {
-        switch (m_state)
-        {
-            case TransiveState::handshake:
-                if (m_receivedHandshake == LINK_MASTER_HANDSHAKE 
-                    || m_transmitHandShake == LINK_MASTER_HANDSHAKE)
-                {
-                    m_state = TransiveState::crc;
-                }
-                break;
+    void onTransiveDone();
 
-            case TransiveState::crc:
-                k_timer_start(&m_timeoutTimer, K_MSEC(14), K_NO_WAIT);
-                m_state = TransiveState::command;
-                m_crc = 0x00;
-                break;
-
-            case TransiveState::command:
-                
-                if (m_commandIndex != 8) return;
-
-                m_commandIndex = 0;
-                m_state = TransiveState::crc;
-                k_timer_stop(&m_timeoutTimer);
-                k_sem_give(&m_commandRxCompleteSemaphore);
-                
-                if (m_handler.transiveDone != nullptr && m_handler.transiveDone() == CommandState::done)
-                {
-                    m_idle = true;
-                    m_handler = emptyCommand();
-                }
-                break;
-            
-            default: break;
-        }
-    }
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
 private:
     bool m_idle = true;
+    Mode g_mode = Mode::slave;
 
     uint16_t m_handshakeCount = 0;
     uint16_t m_receivedHandshake = LINK_SLAVE_HANDSHAKE;
@@ -204,6 +178,7 @@ private:
     TransiveState m_state = TransiveState::handshake;
 
     struct k_timer m_timeoutTimer;
+    MasterClock m_masterClock;
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
     // Callbacks

@@ -27,4 +27,4 @@ struct LinkPlayerBlock
 
 const struct LinkPlayerBlock* linkPLayer(uint32_t linkype);
 
-const struct LinkPlayerBlock* corruptedLinkPLayer();
+const struct LinkPlayerBlock* corruptedLinkPLayer(uint32_t linkype);

@@ -21,7 +21,16 @@ class TradeConnection
 
 public:
     TradeConnection(PacketLayer& layer) : m_packetLayer(layer)
-    {}
+    {
+        m_packetLayer.setMode(PacketLayer::Mode::master);
+        k_timer_init(&m_commandRequestTimer, requestBlockCommand, NULL);
+        k_timer_user_data_set(&m_commandRequestTimer, this);
+    }
+
+    ~TradeConnection()
+    {
+        while(!m_packetLayer.idle()) {};
+    }
 
     void process();
 
@@ -47,61 +56,15 @@ private:
     struct k_sem m_commandSemaphore;
     std::array<uint16_t, 8> m_currentCommand;
 
-    // size_t m_commandIndex = 0;
-    // std::array<CommandEntry, 7> commandSequence =
-    // {{
-    //     {
-    //         .transive = sendLinkTypeCommand(LINKTYPE_TRADE_CONNECTING),
-    //         .setupCb = nullptr
-    //     },
-    //     {
-    //         .transive = blockCommand(),
-    //         .setupCb = []() 
-    //         {
-    //             const struct LinkPlayerBlock* linkPlayerBlock = linkPLayer(LINKTYPE_TRADE_CONNECTING);
-    //             blockCommandSetup(linkPlayerBlock, sizeof(*linkPlayerBlock), sizeof(*linkPlayerBlock));
-    //         }
-    //     },
-    //     {
-    //         .transive = blockCommand(),
-    //         .setupCb = []() 
-    //         {
-    //             const auto party = std::as_bytes(getParty().subspan<0, 2>());
-    //             blockCommandSetup(party.data(), party.size(), 200);
-    //         }
-    //     },
-    //     {
-    //         .transive = blockCommand(),
-    //         .setupCb = []() 
-    //         {
-    //             const auto party = std::as_bytes(getParty().subspan<2, 2>());
-    //             blockCommandSetup(party.data(), party.size(), 200);
-    //         }
-    //     },
-    //     {
-    //         .transive = blockCommand(),
-    //         .setupCb = []() 
-    //         {
-    //             const auto party = std::as_bytes(getParty().subspan<4, 2>());
-    //             blockCommandSetup(party.data(), party.size(), 200);
-    //         }
-    //     },
-    //     {
-    //         .transive = blockCommand(),
-    //         .setupCb = []() 
-    //         {
-    //             const auto mail = getEmptyMailPayload();
-    //             blockCommandSetup(mail.data(), mail.size(), 220);
-    //         }
-    //     },
-    //     {
-    //         .transive = blockCommand(),
-    //         .setupCb = []() 
-    //         {
-    //             blockCommandSetup(nullptr, 0, 40); 
-    //         }
-    //     }
-    // }};
+    struct k_timer m_commandRequestTimer;
 
     size_t m_emptyCounter = 0;
+    bool m_requestBlock = false;
+
+    static void requestBlockCommand(struct k_timer *timer)
+    {
+        void* userData = k_timer_user_data_get(timer);
+        TradeConnection* self = static_cast<TradeConnection*>(userData);
+        self->m_requestBlock = true;
+    }
 };

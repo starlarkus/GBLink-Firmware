@@ -11,11 +11,19 @@
 void TradeConnection::handleInitialDataExchange()
 {
    
-    m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE_CONNECTING));
+    m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_BATTLE));
 
     while (true)
     {
         auto command = m_packetLayer.getCommand();
+
+        if (m_requestBlock)
+        {
+            m_requestBlock = false;
+            m_packetLayer.setTransiveHandler(sendBlockCommandRequestCommand(2));
+            continue;
+        }
+
 
         switch(command[0])
         {
@@ -27,50 +35,54 @@ void TradeConnection::handleInitialDataExchange()
                 {
                     case TradeConnectionState::LinkPlayer:
                     {
-                        const struct LinkPlayerBlock* linkPlayerBlock = linkPLayer(LINKTYPE_TRADE_CONNECTING);
+                        const struct LinkPlayerBlock* linkPlayerBlock = corruptedLinkPLayer(LINKTYPE_BATTLE);
                         blockCommandSetup(linkPlayerBlock, sizeof(*linkPlayerBlock), sizeof(*linkPlayerBlock));
                         m_blockState = TradeConnectionState::PartyPart0;
+                        k_timer_start(&m_commandRequestTimer, K_MSEC(1000), K_NO_WAIT);
                         break;
                     }
 
-                    case TradeConnectionState::PartyPart0:
-                    {
-                        const auto party = std::as_bytes(getParty().subspan<0, 2>());
-                        blockCommandSetup(party.data(), party.size(), 200);
-                        m_blockState = TradeConnectionState::PartyPart1;
-                        break;
-                    }
+                    // case TradeConnectionState::PartyPart0:
+                    // {
+                    //     const auto party = std::as_bytes(getParty().subspan<0, 2>());
+                    //     blockCommandSetup(party.data(), party.size(), 200);
+                    //     m_blockState = TradeConnectionState::PartyPart1;
+                    //     k_timer_start(&m_commandRequestTimer, K_MSEC(1000), K_NO_WAIT);
+                    //     break;
+                    // }
 
-                    case TradeConnectionState::PartyPart1:
-                    {
-                        const auto party = std::as_bytes(getParty().subspan<2, 2>());
-                        blockCommandSetup(party.data(), party.size(), 200);
-                        m_blockState = TradeConnectionState::PartyPart2;
-                        break;
-                    }
+                    // case TradeConnectionState::PartyPart1:
+                    // {
+                    //     const auto party = std::as_bytes(getParty().subspan<2, 2>());
+                    //     blockCommandSetup(party.data(), party.size(), 200);
+                    //     m_blockState = TradeConnectionState::PartyPart2;
+                    //     k_timer_start(&m_commandRequestTimer, K_MSEC(1000), K_NO_WAIT);
+                    //     break;
+                    // }
 
-                    case TradeConnectionState::PartyPart2:
-                    {
-                        const auto party = std::as_bytes(getParty().subspan<4, 2>());
-                        blockCommandSetup(party.data(), party.size(), 200);
-                        m_blockState = TradeConnectionState::Mail;
-                        break;
-                    }
+                    // case TradeConnectionState::PartyPart2:
+                    // {
+                    //     const auto party = std::as_bytes(getParty().subspan<4, 2>());
+                    //     blockCommandSetup(party.data(), party.size(), 200);
+                    //     k_timer_start(&m_commandRequestTimer, K_MSEC(1000), K_NO_WAIT);
+                    //     break;
+                    // }
                     
-                    case TradeConnectionState::Mail:
-                    {
-                        const auto mail = getEmptyMailPayload();
-                        blockCommandSetup(mail.data(), mail.size(), 220);
-                        m_blockState = TradeConnectionState::Ribbons;
-                        break;
-                    }
+                    // case TradeConnectionState::Mail:
+                    // {
+                    //     const auto mail = getEmptyMailPayload();
+                    //     blockCommandSetup(mail.data(), mail.size(), 220);
+                    //     m_blockState = TradeConnectionState::Ribbons;
+                    //     k_timer_start(&m_commandRequestTimer, K_MSEC(1000), K_NO_WAIT);
+                    //     break;
+                    // }
 
-                    case TradeConnectionState::Ribbons:
-                    {
-                        blockCommandSetup(nullptr, 0, 40); 
-                        m_blockState = TradeConnectionState::LinkCMD;
-                        break;
-                    }
+                    // case TradeConnectionState::Ribbons:
+                    // {
+                    //     blockCommandSetup(nullptr, 0, 40); 
+                    //     m_blockState = TradeConnectionState::LinkCMD;
+                    //     break;
+                    // }
 
                     default: break;
 
@@ -120,7 +132,6 @@ void TradeConnection::handleTradeNegotiations()
                 
             case LINKCMD_READY_CLOSE_LINK:
                 m_packetLayer.setTransiveHandler(readyCloseLinkCommand());
-                while(!m_packetLayer.idle()) {};
                 return;
             
             default: break;

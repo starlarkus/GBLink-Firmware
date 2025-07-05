@@ -10,12 +10,20 @@ class TradeSetup
     enum class BlockCommandState : uint8_t
     {
         LinkPlayer = 0x00,
-        TrainerCard = 0x01
+        TrainerCard = 0x01,
+        RequestTrainerCard = 0x02
     };
 
 public:
-    TradeSetup(PacketLayer& layer) : m_packetLayer(layer)
-    {}
+    TradeSetup(PacketLayer& layer, uint16_t linkType) : m_packetLayer(layer), m_linkType(linkType)
+    {
+        m_packetLayer.setMode(PacketLayer::Mode::master);
+    }
+
+    ~TradeSetup()
+    {
+        while(!m_packetLayer.idle()) {};
+    }
 
     void process();
 
@@ -24,6 +32,7 @@ private:
     BlockCommandState m_blockState = BlockCommandState::LinkPlayer;
     PacketLayer& m_packetLayer;
     struct k_sem m_commandSemaphore;
+    uint16_t m_linkType;
     std::array<uint16_t, 8> m_currentCommand;
 
     size_t m_movementDataIndex = 0;

@@ -1,5 +1,7 @@
 #include <zephyr/kernel.h>
 
+#pragma once
+
 enum LinkMode
 {
     MASTER,
@@ -15,6 +17,8 @@ void link_setTransmitCallback(TransmitHandler cb, void* userData);
 void link_setReceiveCallback(ReceiveHandler cb, void* userData);
 
 void link_setTransiveDoneCallback(TransiveDoneHandler cb, void* userData);
+
+void link_startTransive();
 
 enum LinkMode link_getMode();
 

@@ -18,7 +18,14 @@ class TradeDisconnect
 
 public:
     TradeDisconnect(PacketLayer& layer) : m_packetLayer(layer)
-    {}
+    {
+        m_packetLayer.setMode(PacketLayer::Mode::slave);
+    }
+
+    ~TradeDisconnect()
+    {
+        while(!m_packetLayer.idle()) {};
+    }
 
     void process();
 

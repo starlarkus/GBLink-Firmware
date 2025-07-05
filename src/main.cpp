@@ -7,14 +7,17 @@
 
 #include "link_defines.h"
 
-#include "payloads/pokemon.hpp"
-
 int main(void)
 {
     PacketLayer g_packetLayer = PacketLayer();
-    TradeSetup g_tradeSetup(g_packetLayer);
-    TradeConnection g_tradeConnection(g_packetLayer);
-    TradeDisconnect g_tradeDisconnect(g_packetLayer);
+    {
+        TradeSetup tradeSetup(g_packetLayer, 0x2233);
+        tradeSetup.process();
+    }
+    {
+        TradeConnection tradeConnection(g_packetLayer);
+        tradeConnection.process();
+    }
 
     while (true)
     {
@@ -27,17 +30,30 @@ int main(void)
                 switch(command[1])
                 {
                     case LINKTYPE_TRADE_SETUP:
-                        g_tradeSetup.process();
-                        g_packetLayer.changeLinkLayerDirection();
-                        g_tradeConnection.process(); // connection section is master mode
-                        g_packetLayer.changeLinkLayerDirection();
+                    {
+                        {
+                            //TradeSetup tradeSetup(g_packetLayer);
+                            //tradeSetup.process();
+                        }
+                        {
+                            TradeConnection tradeConnection(g_packetLayer);
+                            tradeConnection.process();
+                        }
+                        break;
+                    }
 
                     case LINKTYPE_TRADE_DISCONNECTED:
-                        g_tradeDisconnect.process();
-                        g_packetLayer.changeLinkLayerDirection();
-                        g_tradeConnection.process(); // connection section is master mode
-                        g_packetLayer.changeLinkLayerDirection();
+                    {
+                        {
+                            TradeDisconnect tradeDisconnect(g_packetLayer);
+                            tradeDisconnect.process();
+                        }
+                        {
+                            TradeConnection tradeConnection(g_packetLayer);
+                            tradeConnection.process();
+                        }
                         break;
+                    }
                     
                     case LINKTYPE_TRADE:
                         break;

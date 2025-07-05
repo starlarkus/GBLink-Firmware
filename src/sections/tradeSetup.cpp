@@ -15,24 +15,33 @@ extern "C"
 
 void TradeSetup::process()
 {
+    m_packetLayer.setTransiveHandler(sendLinkTypeCommand(m_linkType));
+
     while(true)
     {
         auto command = m_packetLayer.getCommand();
+
+        if (m_blockState == BlockCommandState::RequestTrainerCard && m_packetLayer.idle())
+        {
+            m_packetLayer.setTransiveHandler(sendBlockCommandRequestCommand(2));
+            m_blockState = BlockCommandState::TrainerCard;
+            continue;
+        }
+        
         switch(command[0])
         {
+
             case LINKCMD_INIT_BLOCK:
             {
-                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
-                gpio_pin_toggle(DEVICE_DT_GET(DT_NODELABEL(gpioa)), 1);
                 auto transive = blockCommand();
 
                 switch(m_blockState)
                 {
                     case BlockCommandState::LinkPlayer:
                     {
-                        const struct LinkPlayerBlock* linkPlayerBlock = linkPLayer(LINKTYPE_TRADE_SETUP);
+                        const struct LinkPlayerBlock* linkPlayerBlock = linkPLayer(m_linkType);
                         blockCommandSetup(linkPlayerBlock, sizeof(*linkPlayerBlock), sizeof(*linkPlayerBlock));
-                        m_blockState = BlockCommandState::TrainerCard;
+                        m_blockState = BlockCommandState::RequestTrainerCard;
                         break;
                     }
                     
@@ -42,6 +51,7 @@ void TradeSetup::process()
                         blockCommandSetup(trainerCard, sizeof(*trainerCard), 0x64);
                         break;
                     }
+                    default: continue;
                 }
                 m_packetLayer.setTransiveHandler(transive);
                 break;
@@ -65,7 +75,8 @@ void TradeSetup::process()
             
             case LINKCMD_READY_CLOSE_LINK:
                 m_packetLayer.setTransiveHandler(readyCloseLinkCommand());
-                while(!m_packetLayer.idle()) {};
+                k_sleep(K_MSEC(40));
+                m_packetLayer.reset(); //master
                 k_sleep(K_MSEC(200));
                 return;
             
