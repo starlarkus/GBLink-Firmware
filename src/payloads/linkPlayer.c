@@ -1,4 +1,4 @@
-#include "linkPlayer.hpp"
+#include "linkPlayer.h"
 
 static struct LinkPlayerBlock g_linkPlayer = 
 {

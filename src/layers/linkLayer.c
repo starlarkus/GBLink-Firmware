@@ -226,6 +226,7 @@ static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32
             break;
     }
     irq_unlock(lock);
+    NVIC_EnableIRQ(USB_IRQn);
 }
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
@@ -259,6 +260,7 @@ enum LinkMode link_getMode()
 
 void link_startTransive()
 {
+    NVIC_DisableIRQ(USB_IRQn);
     if (LL_TIM_IsActiveFlag_UPDATE(TIM16)) LL_TIM_ClearFlag_UPDATE(TIM16);
     if (g_mode != MASTER) return;
 

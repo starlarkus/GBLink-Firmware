@@ -1,6 +1,7 @@
 #include <span>
 
 #include "../layers/packetLayer.hpp"
+#include "../layers/usbLayer.hpp"
 
 #pragma once
 

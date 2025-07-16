@@ -2,10 +2,9 @@
 
 extern "C"
 {
-    #include "../payloads/trainerCard.h"    
+    #include "../payloads/trainerCard.h"
+    #include "../payloads/linkPlayer.h"
 }
-
-#include "../payloads/linkPlayer.hpp"
 
 #include "../callbacks/commands.hpp"
 
@@ -20,13 +19,15 @@ void TradeSetup::process()
     while(true)
     {
         auto command = m_packetLayer.getCommand();
-
+        
         if (m_blockState == BlockCommandState::RequestTrainerCard && m_packetLayer.idle())
         {
             m_packetLayer.setTransiveHandler(sendBlockCommandRequestCommand(2));
             m_blockState = BlockCommandState::TrainerCard;
             continue;
         }
+        
+        if (command[0] != 0x00) UsbLayer::getInstance().sendData(std::span(reinterpret_cast<const uint8_t*>(command.data()), 16));
         
         switch(command[0])
         {

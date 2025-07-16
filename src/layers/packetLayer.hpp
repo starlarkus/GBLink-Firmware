@@ -63,7 +63,7 @@ public:
 
     void disableHandshake() { m_transmitHandShake = 0x00; }
 
-    bool gbaHasSendHandShake() { m_receivedHandshake == LINK_SLAVE_HANDSHAKE; }
+    bool gbaHasSendHandShake() { return m_receivedHandshake == LINK_SLAVE_HANDSHAKE; }
 
     void reset();
 

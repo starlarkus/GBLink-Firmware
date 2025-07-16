@@ -1,6 +1,9 @@
 #include "tradeDisconnected.hpp"
 
-#include "../payloads/linkPlayer.hpp"
+extern "C"
+{
+    #include "../payloads/linkPlayer.h"
+}
 
 #include "../callbacks/commands.hpp"
 

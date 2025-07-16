@@ -1,6 +1,7 @@
 #include <zephyr/kernel.h>
 
 #include "./layers/packetLayer.hpp"
+#include "./layers/usbLayer.hpp"
 #include "./sections/tradeSetup.hpp"
 #include "./sections/tradeConnection.hpp"
 #include "./sections/tradeDisconnected.hpp"
@@ -9,9 +10,12 @@
 
 int main(void)
 {
+    UsbLayer& usbLayer = UsbLayer::getInstance();
+
+    k_sleep(K_MSEC(5000));
     PacketLayer g_packetLayer = PacketLayer();
     {
-        TradeSetup tradeSetup(g_packetLayer, 0x2233);
+        TradeSetup tradeSetup(g_packetLayer, LINKTYPE_TRADE_SETUP);
         tradeSetup.process();
     }
     {

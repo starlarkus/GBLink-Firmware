@@ -282,8 +282,10 @@ namespace
     struct UsbConfig 
     {
         struct usb_if_descriptor if0;
-        struct usb_ep_descriptor if0_in_ep;
-        struct usb_ep_descriptor if0_out_ep;
+        struct usb_ep_descriptor if0_in_ep_data;
+        struct usb_ep_descriptor if0_out_ep_data;
+        struct usb_ep_descriptor if0_in_ep_command;
+        struct usb_ep_descriptor if0_out_ep_command;
     } __packed;
 
     USBD_CLASS_DESCR_DEFINE(primary, 0) UsbConfig m_usbServiceDescriptor = {
@@ -292,40 +294,64 @@ namespace
             .bDescriptorType = USB_DESC_INTERFACE,
             .bInterfaceNumber = 0,
             .bAlternateSetting = 0,
-            .bNumEndpoints = 2,
+            .bNumEndpoints = 4,
             .bInterfaceClass = USB_BCC_VENDOR,
             .bInterfaceSubClass = 0,
             .bInterfaceProtocol = 0,
             .iInterface = 0
         },
-        .if0_in_ep = {
+        .if0_in_ep_data = {
             .bLength = sizeof(struct usb_ep_descriptor),
             .bDescriptorType = USB_DESC_ENDPOINT,
-            .bEndpointAddress = AUTO_EP_IN,
+            .bEndpointAddress = AUTO_EP_IN | 0x1,
             .bmAttributes = USB_DC_EP_INTERRUPT,
             .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
-            .bInterval = 1
+            .bInterval = 5
         },
-        .if0_out_ep = {
+        .if0_out_ep_data = {
             .bLength = sizeof(struct usb_ep_descriptor),
             .bDescriptorType = USB_DESC_ENDPOINT,
-            .bEndpointAddress = AUTO_EP_OUT,
+            .bEndpointAddress = AUTO_EP_OUT | 0x1,
             .bmAttributes = USB_DC_EP_INTERRUPT,
             .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
-            .bInterval = 1
+            .bInterval = 5
+        },
+        .if0_in_ep_command = {
+            .bLength = sizeof(struct usb_ep_descriptor),
+            .bDescriptorType = USB_DESC_ENDPOINT,
+            .bEndpointAddress = AUTO_EP_IN | 0x2,
+            .bmAttributes = USB_DC_EP_INTERRUPT,
+            .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
+            .bInterval = 5
+        },
+        .if0_out_ep_command = {
+            .bLength = sizeof(struct usb_ep_descriptor),
+            .bDescriptorType = USB_DESC_ENDPOINT,
+            .bEndpointAddress = AUTO_EP_OUT | 0x2,
+            .bmAttributes = USB_DC_EP_INTERRUPT,
+            .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
+            .bInterval = 5
         }
     };
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-    struct usb_ep_cfg_data m_webusnEndpointConfig[] = {
+    struct usb_ep_cfg_data m_webUsbEndpointConfig[] = {
         {
             .ep_cb = usb_transfer_ep_callback,
-            .ep_addr = AUTO_EP_IN
+            .ep_addr = AUTO_EP_IN | 0x1
         },
         {
             .ep_cb	= usb_transfer_ep_callback,
-            .ep_addr = AUTO_EP_OUT
+            .ep_addr = AUTO_EP_OUT | 0x1
+        },
+        {
+            .ep_cb = usb_transfer_ep_callback,
+            .ep_addr = AUTO_EP_IN | 0x2
+        },
+        {
+            .ep_cb	= usb_transfer_ep_callback,
+            .ep_addr = AUTO_EP_OUT | 0x2
         }
     };
 
@@ -334,15 +360,17 @@ namespace
     USBD_DEFINE_CFG_DATA(m_usbConfig) = {
         .usb_device_description = NULL,
         .interface_descriptor = &m_usbServiceDescriptor.if0,
-        .cb_usb_status = NULL,
+        .cb_usb_status = nullptr,
         .interface = {
             .class_handler = NULL,
             .vendor_handler = vendorRequestHandler,
             .custom_handler = customRequestHandler,
         },
-        .num_endpoints = ARRAY_SIZE(m_webusnEndpointConfig),
-        .endpoint = m_webusnEndpointConfig
+        .num_endpoints = ARRAY_SIZE(m_webUsbEndpointConfig),
+        .endpoint = m_webUsbEndpointConfig
     };
+
+    //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//s
 
     static int usb_init()
     {
@@ -350,7 +378,8 @@ namespace
 	    usb_bos_register_cap((void *)&bos_cap_msosv2);
 	    usb_bos_register_cap((void *)&bos_cap_lpm);
 
-        return 0;
+        int ret = usb_enable(NULL);
+        return ret;
     }
 }
 

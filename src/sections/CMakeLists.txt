@@ -1,3 +1,4 @@
 zephyr_library_sources(tradeSetup.cpp)
 zephyr_library_sources(tradeConnection.cpp)
 zephyr_library_sources(tradeDisconnected.cpp)
+zephyr_library_sources(usbLinkBridge.cpp)

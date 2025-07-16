@@ -3,7 +3,12 @@
 #include "../layers/packetLayer.hpp"
 #include "../payloads/pokemon.hpp"
 #include "../payloads/mail.hpp"
-#include "../payloads/linkPlayer.hpp"
+
+extern "C"
+{
+    #include "../payloads/linkPlayer.h"
+}
+
 
 #pragma once
 
