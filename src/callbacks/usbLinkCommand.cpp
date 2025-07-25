@@ -15,7 +15,7 @@ void usbLink_receiveHandler(std::span<const uint8_t> data, void*)
 
 void usbLink_loadTransivePacket()
 {
-    if (k_msgq_num_used_get(&g_packetQueue) > 1)
+    if (k_msgq_num_used_get(&g_packetQueue) >= 1)
     {
         g_packetAvailable = (k_msgq_get(&g_packetQueue, packet, K_NO_WAIT) == 0);
     }

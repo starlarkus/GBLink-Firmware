@@ -7,13 +7,15 @@ class LinkModule
     {
         SetModeMaster = 0x10,
         SetModeSlave = 0x11,
-        StartHandshake = 0x12
+        StartHandshake = 0x12,
+        ConnectLink = 0x13
     };
 
 public:
     LinkModule(PacketLayer& packetLayer) : m_packetLayer(packetLayer)
     {
         m_packetLayer.disableHandshake();
+        k_event_init(&m_connectEvent);
     }
 
     void execute();
@@ -26,6 +28,8 @@ private:
     void establishConncection();
 
     PacketLayer& m_packetLayer;
+
+    struct k_event m_connectEvent;
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
     // CALLS

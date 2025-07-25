@@ -11,6 +11,10 @@ enum class LinkStatus : uint16_t
     HandshakeWaiting = 0xFF02,
     HandshakeReceived = 0xFF03,
     HandshakeFinished = 0xFF04,
+
+    LinkConnected = 0xFF05,
+
+    StatusDebug = 0xFFFF
 };
 
 inline bool sendLinkStatus(LinkStatus status)

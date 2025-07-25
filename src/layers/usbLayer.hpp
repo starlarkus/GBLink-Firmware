@@ -5,14 +5,15 @@
 #include <span>
 #include <array>
 #include <algorithm>
+#include <zephyr/kernel.h>
 
 #pragma once
 
 class UsbLayer
 {
-    static constexpr uint8_t commandOutEndpoint = 0;
+    static constexpr uint8_t commandOutEndpoint = 1;
     static constexpr uint8_t statusInEndpoint = 129;
-    static constexpr uint8_t dataOutEndpoint = 1;
+    static constexpr uint8_t dataOutEndpoint = 2;
     static constexpr uint8_t dataInEndpoint = 130;
 
     static constexpr uint16_t m_endpointSize = 64;
@@ -35,6 +36,7 @@ public:
     bool sendStatus(std::span<const uint8_t> data)
     {
         if (!m_endpointsEnabled) return false;
+        k_sem_take(&m_waitForFreeEndpoint, K_FOREVER);
         std::ranges::copy(data, m_sendData.begin());
         return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) != 0;
     }
@@ -42,6 +44,7 @@ public:
     bool sendStatus(std::initializer_list<uint8_t> data)
     {
         if (!m_endpointsEnabled) return false;
+        k_sem_take(&m_waitForFreeEndpoint, K_FOREVER);
         std::ranges::copy(data, m_sendData.begin());
         return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) != 0;
     }
@@ -95,6 +98,7 @@ public:
 
 private:
     bool m_endpointsEnabled = false;
+    struct k_sem m_waitForFreeEndpoint;
 
     struct ReceiveDelegate
     {
@@ -144,6 +148,7 @@ private:
     {
         perpareNextReceive(m_receiveCommandHandler);
         perpareNextReceive(m_receiveDataCommandHandler);
+        k_sem_init(&m_waitForFreeEndpoint, 1, 1);
     }
 
     static void m_usbReadCallback(uint8_t ep, int size, void* userData)
@@ -154,7 +159,7 @@ private:
 
     static void m_usbWriteCallback(uint8_t ep, int size, void* userData)
     {
-        //UsbLayer* self = static_cast<UsbLayer*>(userData);
-        //lift mutex
+        UsbLayer* self = static_cast<UsbLayer*>(userData);
+        k_sem_give(&self->m_waitForFreeEndpoint);
     }
 };

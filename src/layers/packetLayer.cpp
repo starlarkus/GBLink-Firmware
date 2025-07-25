@@ -5,11 +5,12 @@ void PacketLayer::onTransiveDone()
     switch (m_state)
     {
         case TransiveState::handshake:
+            k_sem_give(&m_handshakeSemaphore);
             if (m_receivedHandshake == LINK_MASTER_HANDSHAKE 
                 || m_transmitHandShake == LINK_MASTER_HANDSHAKE)
             {
                 m_state = TransiveState::crc;
-                if (g_mode == Mode::master) m_masterClock.startTransmissionSync();
+                if (m_mode == Mode::master) m_masterClock.startTransmissionSync();
             }
             break;
 
@@ -27,7 +28,6 @@ void PacketLayer::onTransiveDone()
             m_state = TransiveState::crc;
             k_timer_stop(&m_timeoutTimer);
             k_sem_give(&m_commandRxCompleteSemaphore);
-            
             if (m_handler.transiveDone != nullptr && m_handler.transiveDone() == CommandState::done)
             {
                 m_idle = true;
@@ -44,8 +44,8 @@ void PacketLayer::reset()
     m_state = TransiveState::handshake;
     m_idle = true;
     m_commandIndex = 0;
-    m_receivedHandshake = 0x00;
-    m_transmitHandShake = LINK_SLAVE_HANDSHAKE;
+    m_receivedHandshake = LINK_HANDSHAKE_DISABLE;
+    m_transmitHandShake = LINK_HANDSHAKE_DISABLE;
     m_handshakeCount = 0;
     m_crc = LINK_SLAVE_HANDSHAKE;
     m_handler = emptyCommand();
@@ -57,13 +57,14 @@ bool PacketLayer::isGameboyConnected()
     disableHandshake();
     m_state = TransiveState::handshake;
     setMode(PacketLayer::Mode::master);
-    k_busy_wait(50000);
+    k_busy_wait(25000);
     bool connectionCheck = (
         (m_receivedHandshake == 0xFFFC) ||
         (m_receivedHandshake == 0xFFFE) ||
         (m_receivedHandshake == LINK_SLAVE_HANDSHAKE)
     );
-
     reset();
+    link_reset();
+    setMode(PacketLayer::Mode::slave);
     return connectionCheck;
 }

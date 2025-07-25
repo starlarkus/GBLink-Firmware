@@ -39,6 +39,7 @@ public:
         link_setTransiveDoneCallback(&transiveDoneCallback, this);
         
         k_sem_init(&m_commandRxCompleteSemaphore, 0, 1);
+        k_sem_init(&m_handshakeSemaphore, 0, 1);
         k_timer_init(&m_timeoutTimer, &packetTimeout, nullptr);
         k_timer_user_data_set(&m_timeoutTimer, this);
     }
@@ -57,11 +58,27 @@ public:
         return std::span(m_receivedCommand); 
     }
 
+    uint16_t getReceivedHandshake()
+    {
+        k_sem_take(&m_handshakeSemaphore, K_FOREVER);
+        return m_receivedHandshake;
+    }
+
+    uint16_t getTransmittedHandshake()
+    {
+        k_sem_take(&m_handshakeSemaphore, K_FOREVER);
+        return m_transmitHandShake;
+    }
+
     bool idle() { return m_idle; }
 
     void enableHandshake() { m_transmitHandShake = LINK_SLAVE_HANDSHAKE; }
 
-    void disableHandshake() { m_transmitHandShake = 0x00; }
+    void disableHandshake() { m_transmitHandShake = LINK_HANDSHAKE_DISABLE; }
+
+    void connect() { m_transmitHandShake = LINK_MASTER_HANDSHAKE; }
+
+    bool isHandshakeEnabled() { return m_transmitHandShake == LINK_SLAVE_HANDSHAKE; }
 
     bool hasSendHandShake() { return m_receivedHandshake == LINK_SLAVE_HANDSHAKE; }
 
@@ -74,18 +91,20 @@ public:
         switch (mode)
         {
             case Mode::master:
-                if (link_getMode() != MASTER) link_changeMode(MASTER);
+                link_changeMode(MASTER);
                 m_masterClock.enableSync();
                 break;
             
             case Mode::slave:
-                if (link_getMode() != SLAVE) link_changeMode(SLAVE);
+                link_changeMode(SLAVE);
                 m_masterClock.disableSync();
                 break;
         }
 
-        g_mode = mode;
+        m_mode = mode;
     }
+
+    Mode getMode() { return m_mode; }
 
 private:
 
@@ -122,15 +141,6 @@ private:
 
     uint16_t transmitHandshake()
     {
-        if (g_mode == Mode::master && m_receivedHandshake == LINK_SLAVE_HANDSHAKE)
-        {
-            m_handshakeCount++;
-        }
-        if (m_handshakeCount >= 200)
-        {
-            m_handshakeCount = 0;
-            m_transmitHandShake = LINK_MASTER_HANDSHAKE;
-        }
         return m_transmitHandShake;
     }
 
@@ -170,14 +180,15 @@ private:
 
 private:
     bool m_idle = true;
-    Mode g_mode = Mode::slave;
+    Mode m_mode = Mode::slave;
 
     uint16_t m_handshakeCount = 0;
-    uint16_t m_receivedHandshake = LINK_SLAVE_HANDSHAKE;
-    uint16_t m_transmitHandShake = LINK_SLAVE_HANDSHAKE;
+    uint16_t m_receivedHandshake = LINK_HANDSHAKE_DISABLE;
+    uint16_t m_transmitHandShake = LINK_HANDSHAKE_DISABLE;
     uint16_t m_crc = LINK_SLAVE_HANDSHAKE; //first crc is always handshake
 
     struct k_sem m_commandRxCompleteSemaphore;
+    struct k_sem m_handshakeSemaphore;
 
     int m_commandIndex = 0;
     std::array<uint16_t, 8> m_receivedCommand = {};

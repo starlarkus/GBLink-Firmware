@@ -21,6 +21,7 @@
 #define GPIO_PIN_MASTER_SLAVE_INDICATOR 12
 #define BSSR_SET (1 << GPIO_PIN_DATA_INPUT_OUTPUT)
 #define BSSR_RESET (1 << (GPIO_PIN_DATA_INPUT_OUTPUT + 16))
+#define GPIO_PORT_B 0x48000400
 #define DMA_CHANNEL_RX 3
 #define DMA_CHANNEL_TX 5
 
@@ -106,7 +107,7 @@ static void dmaCompleteTransmit(const struct device *dev, void *user_data, uint3
 static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32_t channel, int status);
 
 static struct dma_block_config tx_config = {
-    .dest_address = (uint32_t)(0x48000400 | 0x18), // GPIOA->BSRR
+    .dest_address = (uint32_t)(GPIO_PORT_B | 0x18), // GPIOB->BSRR
     .source_address = (uint32_t)tx_data,
     .block_size = sizeof(tx_data),
     .source_addr_adj = DMA_ADDR_ADJ_INCREMENT,
@@ -129,7 +130,7 @@ static struct dma_config dma_cfg_tx = {
 
 static struct dma_block_config rx_config = {
     .dest_address = (uint32_t)rx_data,
-    .source_address = (uint32_t) (0x48000400 | 0x10), // GPIOA->IDR
+    .source_address = (uint32_t) (GPIO_PORT_B | 0x10), // GPIOB->IDR
     .block_size = sizeof(rx_data),
     .source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE,
     .dest_addr_adj = DMA_ADDR_ADJ_INCREMENT
@@ -196,9 +197,9 @@ static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32
             link_transmitToDma();
 
             //configure data gpio to output, but fast
-            (*(volatile uint32_t *)0x48000000) &= ~(3U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
-            (*(volatile uint32_t *)0x48000000) |= (1U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
-            (*(volatile uint32_t *)(0x48000000 | 0x18)) = BSSR_SET;
+            (*(volatile uint32_t *)GPIO_PORT_B) &= ~(3U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
+            (*(volatile uint32_t *)GPIO_PORT_B) |= (1U << (GPIO_PIN_DATA_INPUT_OUTPUT * 2));
+            (*(volatile uint32_t *)(GPIO_PORT_B | 0x18)) = BSSR_SET;
 
             dma_start(dma, DMA_CHANNEL_TX);
             LL_TIM_EnableCounter(TIM15);
@@ -226,7 +227,6 @@ static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32
             break;
     }
     irq_unlock(lock);
-    NVIC_EnableIRQ(USB_IRQn);
 }
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
@@ -260,7 +260,7 @@ enum LinkMode link_getMode()
 
 void link_startTransive()
 {
-    NVIC_DisableIRQ(USB_IRQn);
+    int lock = irq_lock();
     if (LL_TIM_IsActiveFlag_UPDATE(TIM16)) LL_TIM_ClearFlag_UPDATE(TIM16);
     if (g_mode != MASTER) return;
 
@@ -273,6 +273,7 @@ void link_startTransive()
     gpio_pin_set(gpioIO, GPIO_PIN_LEADER_START, GPIO_ACTIVE_HIGH);
 
     LL_TIM_EnableCounter(TIM15);
+    irq_unlock(lock);
 }
 
 static void startReceiveSlave(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins)
@@ -315,38 +316,6 @@ static void setUpDMATimer()
     LL_TIM_SetTriggerOutput(TIM3, LL_TIM_TRGO_UPDATE);
 }
 
-void link_changeMode(enum LinkMode mode)
-{
-    if (g_mode == mode) return;
-    
-    switch (mode)
-    {
-        case SLAVE:
-            gpio_pin_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INPUT | GPIO_PULL_UP);
-            gpio_pin_configure(gpioIO, GPIO_PIN_FOLLOWR_START, GPIO_INPUT | GPIO_PULL_UP);
-            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
-            gpio_pin_configure(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_OUTPUT_LOW);
-
-            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_EDGE_FALLING);
-            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
-            LL_TIM_DisableCounter(TIM16);
-            break;
-
-        case MASTER:
-
-            gpio_pin_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_OUTPUT_HIGH);
-            gpio_pin_configure(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_OUTPUT_HIGH);
-            gpio_pin_configure(gpioIO, GPIO_PIN_FOLLOWR_START, GPIO_OUTPUT_HIGH);
-            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT);
-
-            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_DISABLE);
-            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
-            break;
-    }
-
-    g_mode = mode;
-}
-
 static int link_init()
 {
     tx_data[0] = BSSR_RESET;
@@ -372,6 +341,44 @@ static int link_init()
     dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
     dma_start(dma, DMA_CHANNEL_RX);
     return 0;
+}
+
+void link_reset()
+{
+    link_init();
+}
+
+void link_changeMode(enum LinkMode mode)
+{
+    if (g_mode == mode) return;
+    
+    switch (mode)
+    {
+        case SLAVE:
+            
+            gpio_pin_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_configure(gpioIO, GPIO_PIN_FOLLOWR_START, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_configure(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_OUTPUT_LOW);
+
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_EDGE_FALLING);
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
+            LL_TIM_DisableCounter(TIM16);
+            break;
+
+        case MASTER:
+
+            gpio_pin_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_OUTPUT_HIGH);
+            gpio_pin_configure(gpioIO, GPIO_PIN_MASTER_SLAVE_INDICATOR, GPIO_OUTPUT_HIGH);
+            gpio_pin_configure(gpioIO, GPIO_PIN_FOLLOWR_START, GPIO_OUTPUT_HIGH);
+            gpio_pin_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT);
+
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_LEADER_START, GPIO_INT_DISABLE);
+            gpio_pin_interrupt_configure(gpioIO, GPIO_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
+            break;
+    }
+
+    g_mode = mode;
 }
 
 SYS_INIT(link_init, APPLICATION, 1);

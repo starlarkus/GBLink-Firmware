@@ -307,7 +307,7 @@ namespace
             .bEndpointAddress = AUTO_EP_IN | 0x1,
             .bmAttributes = USB_DC_EP_INTERRUPT,
             .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
-            .bInterval = 5
+            .bInterval = 50
         },
         .if0_out_ep_data = {
             .bLength = sizeof(struct usb_ep_descriptor),
@@ -315,7 +315,7 @@ namespace
             .bEndpointAddress = AUTO_EP_OUT | 0x1,
             .bmAttributes = USB_DC_EP_INTERRUPT,
             .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
-            .bInterval = 5
+            .bInterval = 50
         },
         .if0_in_ep_command = {
             .bLength = sizeof(struct usb_ep_descriptor),
@@ -323,7 +323,7 @@ namespace
             .bEndpointAddress = AUTO_EP_IN | 0x2,
             .bmAttributes = USB_DC_EP_INTERRUPT,
             .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
-            .bInterval = 5
+            .bInterval = 4
         },
         .if0_out_ep_command = {
             .bLength = sizeof(struct usb_ep_descriptor),
@@ -331,7 +331,7 @@ namespace
             .bEndpointAddress = AUTO_EP_OUT | 0x2,
             .bmAttributes = USB_DC_EP_INTERRUPT,
             .wMaxPacketSize = sys_cpu_to_le16(UsbLayer::endpointSize()),
-            .bInterval = 5
+            .bInterval = 4
         }
     };
 

@@ -32,9 +32,9 @@ public:
 
     void executeMode()
     {
-        k_timer_start(&m_connectionTimer, K_NO_WAIT, K_MSEC(1000));
+        //k_timer_start(&m_connectionTimer, K_MSEC(1000), K_MSEC(1000));
         k_sem_take(&m_waitForModeSemaphore, K_FOREVER);
-        k_timer_stop(&m_connectionTimer);
+        //k_timer_stop(&m_connectionTimer);
         m_packetLayer.reset();
         switch (m_mode)
         {
@@ -75,7 +75,7 @@ private:
     void isGameboyConnected()
     {
         const LinkStatus status = m_packetLayer.isGameboyConnected() ? LinkStatus::GameboyConnected : LinkStatus::GameboyDisconnected;
-        //sendLinkStatus(status);
+        sendLinkStatus(status);
     }
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
