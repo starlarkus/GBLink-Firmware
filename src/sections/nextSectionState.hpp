@@ -6,5 +6,6 @@ enum class NextSection
     connection,
     disconnect,
     lounge,
-    exit
+    exit,
+    cancel // same as exit, but different reason
 };

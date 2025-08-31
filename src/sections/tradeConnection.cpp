@@ -17,7 +17,7 @@ void TradeConnection::handleInitialDataExchange()
    
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE_CONNECTING));
 
-    while (true)
+    while (!m_cancel)
     {
         auto command = m_packetLayer.getCommand();
 
@@ -128,7 +128,7 @@ NextSection TradeConnection::handleTradeNegotiations()
     bool followupCmd = false;
     uint16_t cmd = 0x00;
 
-    while(true)
+    while(!m_cancel)
     {
         auto command = m_packetLayer.getCommand();
 
@@ -197,6 +197,7 @@ NextSection TradeConnection::handleTradeNegotiations()
         k_sleep(K_MSEC(5));
         NVIC_DisableIRQ(USB_IRQn);
     }
+    return NextSection::cancel; // user canceled from web interface
 }
 
 NextSection TradeConnection::process()

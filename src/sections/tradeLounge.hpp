@@ -18,7 +18,7 @@ class TradeLounge
     };
 
 public:
-    TradeLounge(PacketLayer& layer) : m_packetLayer(layer)
+    TradeLounge(PacketLayer& layer, bool& cancel) : m_packetLayer(layer), m_cancel(cancel)
     {
         //m_packetLayer.setMode(PacketLayer::Mode::master);
     }
@@ -37,6 +37,7 @@ private:
     struct k_sem m_commandSemaphore;
     std::array<uint16_t, 8> m_currentCommand;
 
+    bool& m_cancel;
     size_t m_movementDataIndex = 0;
     std::array<uint16_t, 6> m_movementData = {LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_RIGHT, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_LEFT, LINK_KEY_CODE_READY};
 };

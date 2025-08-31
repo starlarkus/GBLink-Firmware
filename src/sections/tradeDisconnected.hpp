@@ -20,7 +20,7 @@ class TradeDisconnect
     NextSection handleDisconnect();
 
 public:
-    TradeDisconnect(PacketLayer& layer) : m_packetLayer(layer)
+    TradeDisconnect(PacketLayer& layer, bool& cancel) : m_packetLayer(layer), m_cancel(cancel)
     {
         //m_packetLayer.setMode(PacketLayer::Mode::slave);
     }
@@ -34,5 +34,6 @@ public:
 
 private:
     PacketLayer& m_packetLayer;
+    bool& m_cancel;
     BlockCommandState m_blockState = BlockCommandState::None;
 };

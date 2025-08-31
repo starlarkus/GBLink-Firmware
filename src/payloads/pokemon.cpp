@@ -190,11 +190,14 @@ namespace party
         {
             for (int i = 0; i < 6; i++)
             {
-                if (partySlotIsEmpty(g_party[i])) g_party[i] = deserializePokemon(encryptedPkm);
-                g_party[i].mail = 0xFF; // don't bother with that
-                break;
+                if (partySlotIsEmpty(g_party[i]))
+                {
+                    g_party[i] = deserializePokemon(encryptedPkm);
+                    g_party[i].mail = 0xFF; // don't bother with that
+                    break;
+                }
             }
             g_receivedBytes = 0;
-        }   
+        }
     }
 }

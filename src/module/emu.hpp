@@ -17,7 +17,14 @@ public:
 
     bool canHandle(uint8_t command) { return (command & 0xF0) == 0x20; }
 
+    void cancel() 
+    { 
+        m_cancel = true;
+        m_packetLayer.cancel();
+    }
+
 private:
     void connect();
+    bool m_cancel = false;
     PacketLayer& m_packetLayer;
 };

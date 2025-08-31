@@ -17,7 +17,7 @@ NextSection TradeSetup::process()
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(m_linkType));
     NextSection nextSection = NextSection::connection;
 
-    while (true)
+    while (!m_cancel)
     {
         auto command = m_packetLayer.getCommand();
 
@@ -89,4 +89,5 @@ NextSection TradeSetup::process()
         k_sleep(K_MSEC(5));
         NVIC_DisableIRQ(USB_IRQn);
     }
+    return NextSection::cancel; // user canceled from web interface
 }

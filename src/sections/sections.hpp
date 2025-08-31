@@ -1,3 +1,5 @@
+#pragma once
+
 #include "nextSectionState.hpp"
 
 #include "tradeSetup.hpp"

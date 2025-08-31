@@ -12,7 +12,7 @@ NextSection TradeLounge::process()
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE));
     NextSection nextSection = NextSection::connection;
 
-    while (true)
+    while (!m_cancel)
     {
         auto command = m_packetLayer.getCommand();
         NVIC_EnableIRQ(USB_IRQn);
@@ -60,4 +60,5 @@ NextSection TradeLounge::process()
         k_sleep(K_MSEC(5));
         NVIC_DisableIRQ(USB_IRQn);
     }
+    return NextSection::cancel; // user canceled from web interface
 }

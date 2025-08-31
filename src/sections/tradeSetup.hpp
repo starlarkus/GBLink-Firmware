@@ -18,7 +18,7 @@ class TradeSetup
     };
 
 public:
-    TradeSetup(PacketLayer& layer, uint16_t linkType) : m_packetLayer(layer), m_linkType(linkType)
+    TradeSetup(PacketLayer& layer, uint16_t linkType, bool& cancel) : m_packetLayer(layer), m_linkType(linkType), m_cancel(cancel)
     {
         //m_packetLayer.setMode(PacketLayer::Mode::master);
     }
@@ -37,6 +37,7 @@ private:
     struct k_sem m_commandSemaphore;
     uint16_t m_linkType;
     std::array<uint16_t, 8> m_currentCommand;
+    bool& m_cancel;
 
     size_t m_movementDataIndex = 0;
     std::array<uint16_t, 6> m_movementData = {LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_RIGHT, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_LEFT, LINK_KEY_CODE_READY};

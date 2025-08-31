@@ -14,7 +14,7 @@ void TradeDisconnect::exchangeTrainerData()
 {
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE_DISCONNECTED));
 
-    while(true)
+    while(!m_cancel)
     {
         auto command = m_packetLayer.getCommand();
 
@@ -42,7 +42,7 @@ void TradeDisconnect::exchangeTrainerData()
 
 NextSection TradeDisconnect::handleDisconnect()
 {
-    while(true)
+    while(!m_cancel)
     {
         auto command = m_packetLayer.getCommand();
 
@@ -93,6 +93,7 @@ NextSection TradeDisconnect::handleDisconnect()
         k_sleep(K_MSEC(5));
         NVIC_DisableIRQ(USB_IRQn);
     }
+    return NextSection::cancel; // user canceled from web interface
 }
 
 

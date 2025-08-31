@@ -9,7 +9,8 @@ class Control
 {
     enum class ControlCommand
     {
-        SetMode = 0x00
+        SetMode = 0x00,
+        Cancel = 0x01
     };
 
     enum class Mode 
@@ -73,7 +74,8 @@ private:
 
         switch (static_cast<ControlCommand>(data[0]))
         {
-            case ControlCommand::SetMode: callSetMode(static_cast<Mode>(data[1]));
+            case ControlCommand::SetMode: return callSetMode(static_cast<Mode>(data[1]));
+            case ControlCommand::Cancel: return callCancel();
             default: return;
         }
     }
@@ -92,6 +94,20 @@ private:
     {
         k_sem_give(&m_waitForModeSemaphore);
         m_mode = mode;
+    }
+
+    void callCancel()
+    {
+        switch (m_mode)
+        {
+            case Mode::tradeEmu:
+                m_emuModule.cancel();
+                break;
+            case Mode::onlineLink:
+                //m_linkModule.cancel();
+                m_packetLayer.cancel();
+                break;
+        }
     }
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//

@@ -5,7 +5,6 @@
 #include "../payloads/mail.hpp"
 
 #include "nextSectionState.hpp"
-
 extern "C"
 {
     #include "../payloads/linkPlayer.h"
@@ -27,7 +26,7 @@ class TradeConnection
     };
 
 public:
-    TradeConnection(PacketLayer& layer) : m_packetLayer(layer)
+    TradeConnection(PacketLayer& layer, bool& cancel) : m_packetLayer(layer), m_cancel(cancel)
     {
         //m_packetLayer.setMode(PacketLayer::Mode::master);
         k_timer_init(&m_commandRequestTimer, requestBlockCommand, NULL);
@@ -66,6 +65,7 @@ private:
     std::array<uint16_t, 8> m_currentCommand;
 
     struct k_timer m_commandRequestTimer;
+    bool& m_cancel;
 
     size_t m_emptyCounter = 0;
     bool m_requestBlock = false;

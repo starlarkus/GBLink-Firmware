@@ -65,9 +65,13 @@ public:
 
     uint16_t getTransmittedHandshake()
     {
+        m_waiting = 1;
         k_sem_take(&m_handshakeSemaphore, K_FOREVER);
+        m_waiting = 0;
         return m_transmitHandShake;
     }
+
+    void cancel() {  if (m_waiting == 1) k_sem_give(&m_handshakeSemaphore); }
 
     bool idle() { return m_idle; }
 
@@ -178,6 +182,8 @@ private:
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
 private:
+    atomic_t m_waiting = 0;
+
     bool m_idle = true;
     Mode m_mode = Mode::slave;
 

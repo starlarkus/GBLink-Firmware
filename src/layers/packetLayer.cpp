@@ -49,6 +49,7 @@ void PacketLayer::reset()
     m_handshakeCount = 0;
     m_crc = LINK_SLAVE_HANDSHAKE;
     m_handler = emptyCommand();
+    m_receivedCommand = {};
     m_masterClock.disableSync();
 }
 
