@@ -16,6 +16,8 @@ enum class LinkStatus : uint16_t
     LinkReconnecting = 0xFF06,
     LinkClosed = 0xFF07,
 
+    DeviceReady = 0xFF08,
+
     StatusDebug = 0xFFFF
 };
 

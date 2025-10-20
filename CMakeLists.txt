@@ -26,12 +26,6 @@ target_sources(
     src/main.cpp
 )
 
-target_sources(
-    app
-    PRIVATE
-    src/control.cpp
-)
-
 set_compiler_property(PROPERTY diagnostic -fdiagnostics-color=never)
 
 

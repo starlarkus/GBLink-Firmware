@@ -2,6 +2,7 @@
 
 void EmuModule::execute()
 {
+    m_cancel = false;
     NextSection nextSection = NextSection::setup;
     while (true)
     {
@@ -52,7 +53,10 @@ void EmuModule::execute()
 
 void EmuModule::connect()
 {
-    while(m_cancel || m_packetLayer.getReceivedHandshake() != LINK_SLAVE_HANDSHAKE) {}
+    while(m_packetLayer.getReceivedHandshake() != LINK_SLAVE_HANDSHAKE) 
+    {
+        if (m_cancel) return;
+    }
     m_packetLayer.setMode(PacketLayer::Mode::master);
     m_packetLayer.enableHandshake();
     k_sleep(K_MSEC(500));

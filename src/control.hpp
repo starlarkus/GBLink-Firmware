@@ -36,9 +36,8 @@ public:
 
     void executeMode()
     {
-        //k_timer_start(&m_connectionTimer, K_MSEC(1000), K_MSEC(1000));
         k_sem_take(&m_waitForModeSemaphore, K_FOREVER);
-        //k_timer_stop(&m_connectionTimer);
+        sendLinkStatus(LinkStatus::DeviceReady);
         m_packetLayer.reset();
         switch (m_mode)
         {
@@ -105,7 +104,6 @@ private:
                 break;
             case Mode::onlineLink:
                 //m_linkModule.cancel();
-                m_packetLayer.cancel();
                 break;
         }
     }
