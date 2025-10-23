@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # https://docs.zephyrproject.org/latest/develop/west/zephyr-cmds.html#installing-cmake-packages-west-zephyr-export
 set(BOARD nucleo_f070rb)
 
-set(ZEPHYR_MODULES "/Users/nilskirchhof/Documents/Repo/Gen3TradeEmu/modules/hal/stm32" "/Users/nilskirchhof/Documents/Repo/Gen3TradeEmu/modules/hal/cmsis_6")
+set(ZEPHYR_MODULES "/Users/nilskirchhof/Documents/Repo/Gen3TradeEmu/modules/hal/stm32" "/Users/nilskirchhof/Documents/Repo/Gen3TradeEmu/modules/hal/cmsis")
 find_package(Zephyr REQUIRED HINTS "/Users/nilskirchhof/Documents/Repo/Gen3TradeEmu/zephyr")
 
 

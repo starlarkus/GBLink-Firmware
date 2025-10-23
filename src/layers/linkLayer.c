@@ -5,11 +5,8 @@
 
 #include  <zephyr/drivers/dma.h>
 
-#include "stm32f0xx.h"
 #include "stm32f0xx_ll_tim.h"
-#include "stm32f0xx_ll_rcc.h"
 #include "stm32f0xx_ll_bus.h"
-#include "stm32f0xx_ll_dma.h"
 
 #include "linkLayer.h"
 
@@ -50,8 +47,7 @@ static TransiveDoneHandler g_transiveDoneCallback = NULL;
 
 static enum LinkMode g_mode = SLAVE;
 
-static bool g_lockout = false;
-struct k_timer g_lockoutTimer;
+struct k_timer g_timeout;
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
@@ -174,21 +170,32 @@ static void dmaCompleteTransmit(const struct device *dev, void *user_data, uint3
     switch (g_mode)
     {
         case SLAVE:
+
+            if (g_transiveDoneCallback != NULL) g_transiveDoneCallback(g_transiveDoneUserdata);
+            
+            k_timer_stop(&g_timeout);
+
+            // Prepare state for next recive
+            gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_interrupt_configure(gpioIO, GPIO_SC_PIN_LEADER_START, GPIO_INT_EDGE_FALLING);
+
             LL_TIM_DisableCounter(TIM15);
             LL_TIM_SetCounter(TIM15, 0);
 
             LL_TIM_DisableCounter(TIM3);
             LL_TIM_SetCounter(TIM3, 0);
 
-            if (g_transiveDoneCallback != NULL) g_transiveDoneCallback(g_transiveDoneUserdata);
-
-            // Prepare state for next recive
-            gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
             dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
             dma_start(dma, DMA_CHANNEL_RX);
+
+            dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
             break;
 
         case MASTER:
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
             gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
             gpio_pin_set(gpioIO, GPIO_SO_PIN_FOLLOWER_START, GPIO_ACTIVE_HIGH);
             gpio_pin_interrupt_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INT_EDGE_FALLING);
@@ -206,21 +213,23 @@ static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32
     switch (g_mode)
     {
         case SLAVE:
-
             if (g_receiveCallback != NULL) g_linkTransmit = g_transmitCallback(g_transmitUserData);
             link_transmitToDma();
-
-            //configure data gpio to output, but fast
-            (*(volatile uint32_t *)GPIO_PORT_B) &= ~(3U << (GPIO_SD_PIN_DATA_INPUT_OUTPUT * 2));
-            (*(volatile uint32_t *)GPIO_PORT_B) |= (1U << (GPIO_SD_PIN_DATA_INPUT_OUTPUT * 2));
-            (*(volatile uint32_t *)(GPIO_PORT_B | 0x18)) = BSSR_SET;
-
+            gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_OUTPUT_HIGH);
             dma_start(dma, DMA_CHANNEL_TX);
             LL_TIM_EnableCounter(TIM15);
             break;
             
         case MASTER:
 
+            k_timer_stop(&g_timeout);
+
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
             LL_TIM_DisableCounter(TIM15);
             LL_TIM_SetCounter(TIM15, 0);
 
@@ -229,14 +238,10 @@ static void dmaCompleteReceive(const struct device *dev, void *user_data, uint32
 
             if (g_transiveDoneCallback != NULL) g_transiveDoneCallback(g_transiveDoneUserdata);
 
-            // Prepare state for next recive
-            dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
-            dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
-            dma_start(dma, DMA_CHANNEL_RX);
-            dma_start(dma, DMA_CHANNEL_TX);
-
             gpio_pin_set(gpioIO, GPIO_SC_PIN_LEADER_START, GPIO_ACTIVE_LOW);
             gpio_pin_set(gpioIO, GPIO_SO_PIN_FOLLOWER_START, GPIO_ACTIVE_LOW);
+            gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
+            gpio_pin_interrupt_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
             break;
     }
     irq_unlock(lock);
@@ -274,6 +279,13 @@ enum LinkMode link_getMode()
 void link_startTransive()
 {
     int lock = irq_lock();
+    gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+    gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+    k_timer_start(&g_timeout, K_USEC(600), K_NO_WAIT);
+    dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
+    dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
+    dma_start(dma, DMA_CHANNEL_RX);
+
     if (LL_TIM_IsActiveFlag_UPDATE(TIM16)) LL_TIM_ClearFlag_UPDATE(TIM16);
     if (g_mode != MASTER) return;
 
@@ -281,21 +293,20 @@ void link_startTransive()
     
     link_transmitToDma();
     dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
-    dma_start(dma, DMA_CHANNEL_TX);
     
+    gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_OUTPUT_LOW);
     gpio_pin_set(gpioIO, GPIO_SC_PIN_LEADER_START, GPIO_ACTIVE_HIGH);
-    gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_OUTPUT_HIGH);
 
+    dma_start(dma, DMA_CHANNEL_TX);
     LL_TIM_EnableCounter(TIM15);
     irq_unlock(lock);
 }
 
 static void startReceiveSlave(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins)
 {
-    if (g_lockout) return;
     LL_TIM_EnableCounter(TIM3);
-    k_timer_start(&g_lockoutTimer, K_MSEC(1), K_NO_WAIT);
-    g_lockout = true;
+    k_timer_start(&g_timeout, K_USEC(500), K_NO_WAIT);
+    gpio_pin_interrupt_configure(gpioIO, GPIO_SC_PIN_LEADER_START, GPIO_INT_DISABLE);
 }
 
 static void startReceiveMaster(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins)
@@ -333,9 +344,19 @@ static void setUpDMATimer()
     LL_TIM_SetTriggerOutput(TIM3, LL_TIM_TRGO_UPDATE);
 }
 
-static void link_lockoutReset(struct k_timer* timer)
+static void link_Timeout(struct k_timer* timer)
 {
-    g_lockout = false;
+    switch(g_mode)
+    {
+        case MASTER:
+        {
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            gpio_pin_toggle(gpioIO, GPIO_PIN_DEBUG);
+            return dmaCompleteReceive(NULL, NULL, 0, 0);
+        } 
+        case SLAVE: return dmaCompleteTransmit(NULL, NULL, 0, 0);
+
+    }
 }
 
 static int link_init()
@@ -343,7 +364,7 @@ static int link_init()
     tx_data[0] = BSSR_RESET;
     tx_data[17] = BSSR_SET;
 
-    k_timer_init(&g_lockoutTimer, link_lockoutReset, NULL);
+    k_timer_init(&g_timeout, link_Timeout, NULL);
 
     gpio_pin_configure(gpioIO, GPIO_SC_PIN_LEADER_START, GPIO_INPUT | GPIO_PULL_UP);
     gpio_pin_configure(gpioIO, GPIO_SI_PIN_FOLLOWR_START, GPIO_INPUT | GPIO_PULL_UP);
@@ -361,9 +382,6 @@ static int link_init()
     gpio_add_callback(gpioIO, &g_linkStartReceiveMasterCallback);
     gpio_pin_interrupt_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INT_DISABLE);
 
-    dma_config(dma, DMA_CHANNEL_TX, &dma_cfg_tx);
-    dma_config(dma, DMA_CHANNEL_RX, &dma_cfg_rx);
-    dma_start(dma, DMA_CHANNEL_RX);
     return 0;
 }
 
@@ -393,7 +411,7 @@ void link_changeMode(enum LinkMode mode)
         case MASTER:
 
             gpio_pin_configure(gpioIO, GPIO_SC_PIN_LEADER_START, GPIO_OUTPUT_HIGH);
-            gpio_pin_configure(gpioIO, GPIO_SI_PIN_FOLLOWR_START, GPIO_DISCONNECTED);
+            gpio_pin_configure(gpioIO, GPIO_SI_PIN_FOLLOWR_START, GPIO_OUTPUT_HIGH);
             gpio_pin_configure(gpioIO, GPIO_SD_PIN_DATA_INPUT_OUTPUT, GPIO_INPUT | GPIO_PULL_UP);
             gpio_pin_configure(gpioIO, GPIO_SO_PIN_FOLLOWER_START, GPIO_OUTPUT_HIGH);
 
