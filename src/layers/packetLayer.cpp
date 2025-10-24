@@ -52,20 +52,3 @@ void PacketLayer::reset()
     m_receivedCommand = {};
     m_masterClock.disableSync();
 }
-
-bool PacketLayer::isGameboyConnected()
-{
-    disableHandshake();
-    m_state = TransiveState::handshake;
-    setMode(PacketLayer::Mode::master);
-    k_busy_wait(25000);
-    bool connectionCheck = (
-        (m_receivedHandshake == 0xFFFC) ||
-        (m_receivedHandshake == 0xFFFE) ||
-        (m_receivedHandshake == LINK_SLAVE_HANDSHAKE)
-    );
-    reset();
-    link_reset();
-    setMode(PacketLayer::Mode::slave);
-    return connectionCheck;
-}

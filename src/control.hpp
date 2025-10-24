@@ -29,9 +29,9 @@ public:
     {
         UsbLayer::getInstance().setReceiveCommandHandler(receiveCommandHandler, this);
 
-        k_sem_init(&m_waitForModeSemaphore, 0, 1);
-        k_timer_init(&m_connectionTimer, &connectionCheck, nullptr);
-        k_timer_user_data_set(&m_connectionTimer, this);
+        // k_sem_init(&m_waitForModeSemaphore, 0, 1);
+        // k_timer_init(&m_connectionTimer, &connectionCheck, nullptr);
+        // k_timer_user_data_set(&m_connectionTimer, this);
     }
 
     void executeMode()
@@ -79,12 +79,6 @@ private:
         }
     }
 
-    void isGameboyConnected()
-    {
-        const LinkStatus status = m_packetLayer.isGameboyConnected() ? LinkStatus::GameboyConnected : LinkStatus::GameboyDisconnected;
-        sendLinkStatus(status);
-    }
-
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
     // CALLS
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
@@ -114,12 +108,5 @@ private:
     {
         Control* self = static_cast<Control*>(userData);
         self->receiveCommand(receivedData);
-    }
-
-    static void connectionCheck(struct k_timer *timer)
-    {
-        void* userData = k_timer_user_data_get(timer);
-        Control* self = static_cast<Control*>(userData);
-        self->isGameboyConnected();
     }
 };
