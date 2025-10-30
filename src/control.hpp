@@ -29,15 +29,15 @@ public:
     {
         UsbLayer::getInstance().setReceiveCommandHandler(receiveCommandHandler, this);
 
-        // k_sem_init(&m_waitForModeSemaphore, 0, 1);
-        // k_timer_init(&m_connectionTimer, &connectionCheck, nullptr);
-        // k_timer_user_data_set(&m_connectionTimer, this);
+        k_sem_init(&m_waitForModeSemaphore, 0, 1);
     }
 
     void executeMode()
     {
         k_sem_take(&m_waitForModeSemaphore, K_FOREVER);
-        sendLinkStatus(LinkStatus::DeviceReady);
+        while (!sendLinkStatus(LinkStatus::DeviceReady)) {
+            
+        };
         m_packetLayer.reset();
         switch (m_mode)
         {

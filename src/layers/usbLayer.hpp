@@ -1,4 +1,6 @@
 
+#include "zephyr/drivers/usb/usb_dc.h"
+#include "zephyr/sys/reboot.h"
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/usb/usb_device.h>
 #include <usb_descriptor.h>
@@ -36,24 +38,24 @@ public:
     bool sendStatus(std::span<const uint8_t> data)
     {
         if (!m_endpointsEnabled) return false;
-        k_sem_take(&m_waitForFreeEndpoint, K_FOREVER);
+        if (!k_sem_take(&m_waitForFreeEndpoint, K_MSEC(200))) return false;
         std::ranges::copy(data, m_sendData.begin());
-        return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) != 0;
+        return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) == 0;
     }
 
     bool sendStatus(std::initializer_list<uint8_t> data)
     {
         if (!m_endpointsEnabled) return false;
-        k_sem_take(&m_waitForFreeEndpoint, K_FOREVER);
+        if (!k_sem_take(&m_waitForFreeEndpoint, K_MSEC(200))) return false;
         std::ranges::copy(data, m_sendData.begin());
-        return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) != 0;
+        return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) == 0;
     }
 
     bool sendData(std::span<const uint8_t> data) 
     {
         if (!m_endpointsEnabled) return false;
         std::ranges::copy(data, m_sendData.begin());
-        return usb_transfer(dataInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) != 0;
+        return usb_transfer(dataInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) == 0;
     }
 
     void setReceiveCommandHandler(const UsbReceiveHandler& handler, void* userData)
@@ -91,6 +93,8 @@ public:
         case USB_DC_SUSPEND:
         case USB_DC_RESUME:
             break;
+        case USB_DC_CLEAR_HALT:
+            sys_reboot(SYS_REBOOT_WARM);
         default:
             break;
         }

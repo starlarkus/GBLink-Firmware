@@ -159,7 +159,14 @@ NextSection TradeConnection::handleTradeNegotiations()
 
                     case LINKCMD_READY_TO_TRADE:
                     {
-                        sendLinkCommand(LINKCMD_SET_MONS_TO_TRADE, command[1]);
+                        if (command[1] + 1 > party::partySize())
+                        {
+                            sendLinkStatus(LinkStatus status)
+                        }
+                        else
+                        {
+                            sendLinkCommand(LINKCMD_SET_MONS_TO_TRADE, command[1]);
+                        }
                         break;
                     }
 

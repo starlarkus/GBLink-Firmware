@@ -142,5 +142,7 @@ namespace party
 
     std::span<const Pokemon> getParty();
 
+    int partySize();
+
 }
 

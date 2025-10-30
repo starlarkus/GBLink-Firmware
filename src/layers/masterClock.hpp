@@ -71,7 +71,7 @@ private:
 
     struct counter_top_cfg m_periodicConfig = 
     {
-        .ticks = 50100,
+        .ticks = 50700,
         .callback = periodicCounterInterrupt,
         .user_data = this,
         .flags = 0

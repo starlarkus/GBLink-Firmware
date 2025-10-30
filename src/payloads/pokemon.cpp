@@ -1,16 +1,9 @@
 #include "pokemon.hpp"
 
-#include <ranges>
 #include <algorithm>
 
-namespace party 
+namespace detail
 {
-    static size_t g_receivedBytes = 0;
-
-    static std::array<Pokemon, 6> g_party = {};
-
-    std::span<const Pokemon> getParty() { return g_party; }
-
     template<typename T>
     T swap(std::span<const uint8_t> data)
     {
@@ -30,8 +23,8 @@ namespace party
         return sizeof(fieldT);
     };
 
-    Pokemon deserializePokemon(std::span<const uint8_t> input) {
-        Pokemon result{};
+    party::Pokemon deserializePokemon(std::span<const uint8_t> input) {
+        party::Pokemon result{};
         size_t offset = 0;
         
         // BoxPokemon fields
@@ -148,6 +141,15 @@ namespace party
 
         return result;
     }
+}
+
+namespace party 
+{
+    static size_t g_receivedBytes = 0;
+
+    static std::array<Pokemon, 6> g_party = {};
+
+    std::span<const Pokemon> getParty() { return g_party; }
 
     void clearPartySlot(Pokemon* mon)
     {
@@ -157,7 +159,7 @@ namespace party
         mon->mail = 0xFF;
     }
 
-    bool partySlotIsEmpty(Pokemon mon)
+    bool isPartySlotEmpty(Pokemon mon)
     {
         mon.mail = 0x00;
         uint8_t *raw = (uint8_t*)&mon;
@@ -181,6 +183,16 @@ namespace party
         return 0;
     }
 
+    int partySize()
+    {
+        int size = 0;
+        for (Pokemon& mon : g_party)
+        {
+            if (!isPartySlotEmpty(mon)) size++;
+        }
+        return size;
+    }
+
     void usbReceivePkmFile(std::span<const uint8_t> data, void*)
     {
         static std::array<uint8_t, 0x64> encryptedPkm;
@@ -190,7 +202,7 @@ namespace party
         {
             for (int i = 0; i < 6; i++)
             {
-                if (partySlotIsEmpty(g_party[i]))
+                if (isPartySlotEmpty(g_party[i]))
                 {
                     g_party[i] = deserializePokemon(encryptedPkm);
                     g_party[i].mail = 0xFF; // don't bother with that
