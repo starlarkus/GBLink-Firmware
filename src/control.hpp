@@ -35,9 +35,7 @@ public:
     void executeMode()
     {
         k_sem_take(&m_waitForModeSemaphore, K_FOREVER);
-        while (!sendLinkStatus(LinkStatus::DeviceReady)) {
-            
-        };
+        while (!sendLinkStatus(LinkStatus::DeviceReady)) {};
         m_packetLayer.reset();
         switch (m_mode)
         {
@@ -45,6 +43,7 @@ public:
                 party::partyInit();
                 UsbLayer::getInstance().setReceiveDataHandler(party::usbReceivePkmFile, nullptr);
                 m_emuModule.execute();
+                while (!sendLinkStatus(LinkStatus::EmuTradeSessionFinished)) {}
                 break;
             case Mode::onlineLink:
                 UsbLayer::getInstance().setReceiveDataHandler(usbLink_receiveHandler, nullptr);
@@ -57,7 +56,6 @@ public:
 private:
     PacketLayer& m_packetLayer;
     struct k_sem m_waitForModeSemaphore;
-    struct k_timer m_connectionTimer;
     Mode m_mode;
 
     LinkModule m_linkModule;

@@ -20,7 +20,7 @@ class TradeSetup
 public:
     TradeSetup(PacketLayer& layer, uint16_t linkType, bool& cancel) : m_packetLayer(layer), m_linkType(linkType), m_cancel(cancel)
     {
-        //m_packetLayer.setMode(PacketLayer::Mode::master);
+        
     }
 
     ~TradeSetup()
@@ -40,5 +40,5 @@ private:
     bool& m_cancel;
 
     size_t m_movementDataIndex = 0;
-    std::array<uint16_t, 6> m_movementData = {LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_RIGHT, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_LEFT, LINK_KEY_CODE_READY};
+    std::array<uint16_t, 6> m_movementData = {LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_LEFT, LINK_KEY_CODE_DPAD_UP, LINK_KEY_CODE_DPAD_RIGHT, LINK_KEY_CODE_READY};
 };

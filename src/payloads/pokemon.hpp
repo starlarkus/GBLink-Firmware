@@ -131,18 +131,21 @@ namespace party
         uint16_t spDefense;
     };
 
-
-    Pokemon deserializePokemon(std::span<const uint8_t> input);
-
-    void clearPartySlot(Pokemon* mon);
-
     int partyInit();
+    
+    void partnerPartyInit();
+
+    void partnerPartyConstruct(std::span<const uint8_t> data);
+
+    void clearPartySlot(uint8_t index);
 
     void usbReceivePkmFile(std::span<const uint8_t> data, void*);
 
-    std::span<const Pokemon> getParty();
+    std::span<const uint8_t> getParty();
 
     int partySize();
+
+    void tradePkmnAtIndex(uint8_t index);
 
 }
 

@@ -65,7 +65,13 @@ NextSection TradeSetup::process()
             
             case LINKCMD_SEND_HELD_KEYS:
             {
-                if (command[1] == LINK_KEY_CODE_EXIT_ROOM) nextSection = NextSection::exit; //send exit code
+                if (command[1] == LINK_KEY_CODE_EXIT_ROOM)
+                {
+                    moveCommandInit(LINK_KEY_CODE_EXIT_ROOM);
+                    m_packetLayer.setTransiveHandler(moveCommand());
+                    nextSection = NextSection::exit;
+                    break;
+                }
 
                 if (!m_packetLayer.idle()) break;
 

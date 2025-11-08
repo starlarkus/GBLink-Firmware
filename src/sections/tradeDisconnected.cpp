@@ -7,8 +7,6 @@ extern "C"
 
 #include "../callbacks/commands.hpp"
 
-#include <algorithm>
-
 
 void TradeDisconnect::exchangeTrainerData()
 {

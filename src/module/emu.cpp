@@ -1,4 +1,5 @@
 #include "emu.hpp"
+#include "../linkStatus.hpp"
 
 void EmuModule::execute()
 {
@@ -26,8 +27,8 @@ void EmuModule::execute()
             }
             case NextSection::disconnect:
             {
-                m_packetLayer.setMode(PacketLayer::Mode::master);
-                connect();
+                m_packetLayer.setMode(PacketLayer::Mode::slave);
+                connectSlave();
                 TradeDisconnect tradeDisconnection(m_packetLayer, m_cancel);
                 nextSection = tradeDisconnection.process(); // -> connection / -> cancel
                 break;
@@ -61,4 +62,14 @@ void EmuModule::connect()
     m_packetLayer.enableHandshake();
     k_sleep(K_MSEC(500));
     m_packetLayer.connect();
+}
+
+void EmuModule::connectSlave()
+{
+    while(m_packetLayer.getReceivedHandshake() != LINK_SLAVE_HANDSHAKE) 
+    {
+        if (m_cancel) return;
+    }
+    m_packetLayer.setMode(PacketLayer::Mode::slave);
+    m_packetLayer.enableHandshake();
 }
