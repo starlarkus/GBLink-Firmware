@@ -44,10 +44,7 @@ void LinkModule::execute()
                 m_packetLayer.reset(); // disable sync
                 m_packetLayer.setTransiveHandler(usbLinkCommand());
                 k_sleep(K_MSEC(200));
-                if (m_packetLayer.getMode() == PacketLayer::Mode::master)
-                {
-                    m_packetLayer.setMode(PacketLayer::Mode::master); // enable sync again
-                }
+                m_packetLayer.setMode(m_packetLayerMode); // enable sync again
                 establishConncection();
                 partnerReadyCloseLink = false;
                 readyCloseLink = false;
@@ -122,7 +119,7 @@ void LinkModule::establishConncection()
 
     while(!m_packetLayer.isHandshakeEnabled()) { }
 
-    switch (m_packetLayer.getMode())
+    switch (m_packetLayerMode)
     {
         case PacketLayer::Mode::master:
             while(m_packetLayer.getTransmittedHandshake() != LINK_MASTER_HANDSHAKE) { }

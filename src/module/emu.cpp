@@ -1,5 +1,4 @@
 #include "emu.hpp"
-#include "../linkStatus.hpp"
 
 void EmuModule::execute()
 {

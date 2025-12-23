@@ -1,6 +1,9 @@
 
 #include "zephyr/drivers/usb/usb_dc.h"
+#include "zephyr/irq.h"
 #include "zephyr/sys/reboot.h"
+#include <cerrno>
+#include <cstdint>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/usb/usb_device.h>
 #include <usb_descriptor.h>
@@ -35,27 +38,19 @@ public:
     UsbLayer(UsbLayer&&) = delete;
     UsbLayer& operator=(UsbLayer&&) = delete;
 
-    bool sendStatus(std::span<const uint8_t> data)
+    bool sendStatus(std::span<const uint8_t, 2> data)
     {
         if (!m_endpointsEnabled) return false;
-        if (!k_sem_take(&m_waitForFreeEndpoint, K_MSEC(200))) return false;
         std::ranges::copy(data, m_sendData.begin());
-        return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) == 0;
-    }
-
-    bool sendStatus(std::initializer_list<uint8_t> data)
-    {
-        if (!m_endpointsEnabled) return false;
-        if (!k_sem_take(&m_waitForFreeEndpoint, K_MSEC(200))) return false;
-        std::ranges::copy(data, m_sendData.begin());
-        return usb_transfer(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) == 0;
+        usb_transfer_sync(statusInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE);
+        return true;
     }
 
     bool sendData(std::span<const uint8_t> data) 
     {
         if (!m_endpointsEnabled) return false;
         std::ranges::copy(data, m_sendData.begin());
-        return usb_transfer(dataInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteCallback, this) == 0;
+        return usb_transfer(dataInEndpoint, m_sendData.data(), data.size(), USB_TRANS_WRITE, m_usbWriteDataCallback, this) == 0;
     }
 
     void setReceiveCommandHandler(const UsbReceiveHandler& handler, void* userData)
@@ -121,6 +116,9 @@ private:
         }
     };
 
+    struct k_msgq m_statusMsgQueue;
+    std::array<char, 100> m_statusQueueBuffer;
+
     int perpareNextReceive(ReceiveDelegate& delegate)
     {
         return usb_transfer(delegate.endpoint, delegate.endpointBuffer.data(), delegate.endpointBuffer.size(), USB_TRANS_READ, m_usbReadCallback, &delegate);
@@ -153,6 +151,7 @@ private:
         perpareNextReceive(m_receiveCommandHandler);
         perpareNextReceive(m_receiveDataCommandHandler);
         k_sem_init(&m_waitForFreeEndpoint, 1, 1);
+        k_msgq_init(&m_statusMsgQueue, m_statusQueueBuffer.data(), 2, m_statusQueueBuffer.size() / 2);
     }
 
     static void m_usbReadCallback(uint8_t ep, int size, void* userData)
@@ -161,9 +160,5 @@ private:
         self->layer->receive(size, self);
     }
 
-    static void m_usbWriteCallback(uint8_t ep, int size, void* userData)
-    {
-        UsbLayer* self = static_cast<UsbLayer*>(userData);
-        k_sem_give(&self->m_waitForFreeEndpoint);
-    }
+    static void m_usbWriteDataCallback(uint8_t ep, int size, void* userData){ }
 };

@@ -24,5 +24,5 @@ enum class LinkStatus : uint16_t
 
 inline bool sendLinkStatus(LinkStatus status)
 {
-    return UsbLayer::getInstance().sendStatus(std::span(reinterpret_cast<const uint8_t*>(&status), 2));
+    return UsbLayer::getInstance().sendStatus(std::span<const uint8_t, 2>(reinterpret_cast<const uint8_t*>(&status), 2));
 }
