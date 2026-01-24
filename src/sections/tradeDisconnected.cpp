@@ -16,7 +16,7 @@ void TradeDisconnect::exchangeTrainerData()
     {
         auto command = m_packetLayer.getCommand();
 
-        NVIC_EnableIRQ(USB_IRQn);
+        //NVIC_EnableIRQ(USB_IRQn);
 
         if ((command[0] == LINKCMD_INIT_BLOCK) && (m_blockState == BlockCommandState::None))
         {
@@ -29,12 +29,12 @@ void TradeDisconnect::exchangeTrainerData()
 
         if (m_blockState == BlockCommandState::LinkPlayer && m_packetLayer.idle())
         {
-            NVIC_DisableIRQ(USB_IRQn);
+            //NVIC_DisableIRQ(USB_IRQn);
             return;
         }
 
         k_sleep(K_MSEC(5));
-        NVIC_DisableIRQ(USB_IRQn);
+        //NVIC_DisableIRQ(USB_IRQn);
     }
 }
 
@@ -44,7 +44,7 @@ NextSection TradeDisconnect::handleDisconnect()
     {
         auto command = m_packetLayer.getCommand();
 
-        NVIC_EnableIRQ(USB_IRQn);
+        //NVIC_EnableIRQ(USB_IRQn);
 
         if (m_blockState == BlockCommandState::FinishTrade)
         {
@@ -55,7 +55,7 @@ NextSection TradeDisconnect::handleDisconnect()
             m_blockState = BlockCommandState::None;
 
             k_sleep(K_MSEC(5));
-            NVIC_DisableIRQ(USB_IRQn);
+            //NVIC_DisableIRQ(USB_IRQn);
             continue;
         }
 
@@ -89,7 +89,7 @@ NextSection TradeDisconnect::handleDisconnect()
         }
 
         k_sleep(K_MSEC(5));
-        NVIC_DisableIRQ(USB_IRQn);
+        //NVIC_DisableIRQ(USB_IRQn);
     }
     return NextSection::cancel; // user canceled from web interface
 }

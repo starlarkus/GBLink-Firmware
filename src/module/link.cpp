@@ -31,7 +31,7 @@ void LinkModule::execute()
 
         if (partnerReadyCloseLink && readyCloseLink)
         {   
-            NVIC_EnableIRQ(USB_IRQn);
+            //NVIC_EnableIRQ(USB_IRQn);
 
             if (keepAlive)
             {
@@ -40,7 +40,7 @@ void LinkModule::execute()
                 k_sleep(K_MSEC(40));
                 m_packetLayer.reset(); // disable sync
                 m_packetLayer.setTransiveHandler(usbLinkCommand());
-                k_sleep(K_MSEC(200));
+                k_sleep(K_MSEC(300));
                 m_packetLayer.setMode(m_packetLayerMode); // enable sync again
                 establishConncection();
                 partnerReadyCloseLink = false;
@@ -56,7 +56,7 @@ void LinkModule::execute()
 
         auto linkCommand = m_packetLayer.getCommand();
 
-        NVIC_EnableIRQ(USB_IRQn);
+        //NVIC_EnableIRQ(USB_IRQn);
 
         UsbLayer::getInstance().sendData(std::span(reinterpret_cast<const uint8_t*>(linkCommand.data()), 16));
 
@@ -81,7 +81,7 @@ void LinkModule::execute()
         }
 
         k_sleep(K_MSEC(5));
-        NVIC_DisableIRQ(USB_IRQn);
+        //NVIC_DisableIRQ(USB_IRQn);
     }
 }
 

@@ -9,6 +9,7 @@
 int main(void)
 {
     PacketLayer g_packetLayer = PacketLayer();
+    //g_packetLayer.setMode(PacketLayer::Mode::master);
     g_packetLayer.setMode(PacketLayer::Mode::slave);
     Control g_control = Control(g_packetLayer);
     while (true)

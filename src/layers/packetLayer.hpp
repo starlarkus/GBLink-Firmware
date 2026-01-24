@@ -6,7 +6,10 @@ extern "C"
 
 #include "../callbacks/commands.hpp"
 #include "../link_defines.h"
+
+#ifdef CONFIG_STM32F0
 #include "masterClock.hpp"
+#endif
 
 #include <span>
 #include <zephyr/drivers/gpio.h>
@@ -31,6 +34,10 @@ private:
         handshake
     };
 
+    static constexpr uint32_t timingHandshake = 30097;
+    static constexpr uint32_t timingCommandBytes = 1378;
+    static constexpr uint32_t timingBetweenCommands = 12953;
+
 public:
     PacketLayer()
     {
@@ -40,8 +47,10 @@ public:
         
         k_sem_init(&m_commandRxCompleteSemaphore, 0, 1);
         k_sem_init(&m_handshakeSemaphore, 0, 1);
+        #ifdef CONFIG_STM32F0
         k_timer_init(&m_timeoutTimer, &packetTimeout, nullptr);
         k_timer_user_data_set(&m_timeoutTimer, this);
+        #endif
     }
 
     void setTransiveHandler(struct TransiveStruct handler)
@@ -85,8 +94,6 @@ public:
 
     bool hasSendHandShake() { return m_receivedHandshake == LINK_SLAVE_HANDSHAKE; }
 
-    bool isGameboyConnected();
-
     void reset();
 
     void setMode(Mode mode) 
@@ -95,12 +102,16 @@ public:
         {
             case Mode::master:
                 link_changeMode(MASTER);
+                #ifdef CONFIG_STM32F0
                 m_masterClock.enableSync();
+                #endif
                 break;
             
             case Mode::slave:
                 link_changeMode(SLAVE);
+                #ifdef CONFIG_STM32F0
                 m_masterClock.disableSync();
+                #endif
                 break;
         }
 
@@ -124,14 +135,14 @@ private:
         };
     }
 
-    uint16_t onTransmit()
+    struct NextTransmit onTransmit()
     {
         switch(m_state)
         {
-            case TransiveState::crc: return transmitCrc();
-            case TransiveState::command: return transmitCommand();
-            case TransiveState::handshake: return transmitHandshake();
-            default: return 0x00;
+            case TransiveState::crc: return {transmitCrc(), m_timingUs};
+            case TransiveState::command: return {transmitCommand(), m_timingUs};
+            case TransiveState::handshake: return {transmitHandshake(), m_timingUs};
+            default: return {0x00, m_timingUs};
         };
     }
 
@@ -192,6 +203,8 @@ private:
     uint16_t m_transmitHandShake = LINK_HANDSHAKE_DISABLE;
     uint16_t m_crc = LINK_SLAVE_HANDSHAKE; //first crc is always handshake
 
+    uint32_t m_timingUs = 0;
+
     struct k_sem m_commandRxCompleteSemaphore;
     struct k_sem m_handshakeSemaphore;
 
@@ -202,8 +215,9 @@ private:
     TransiveState m_state = TransiveState::handshake;
 
     struct k_timer m_timeoutTimer;
+    #ifdef CONFIG_STM32F0
     MasterClock m_masterClock;
-
+    #endif
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
     // Callbacks
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
@@ -214,7 +228,7 @@ private:
         return self->onReceive(rxBytes);
     }
 
-    static uint16_t transmitCallback(void* userData)
+    static struct NextTransmit transmitCallback(void* userData)
     {
         PacketLayer* self = static_cast<PacketLayer*>(userData);
         return self->onTransmit();
@@ -226,10 +240,12 @@ private:
         self->onTransiveDone();
     }
 
+    #ifdef CONFIG_STM32F0
     static void packetTimeout(struct k_timer *timer)
     {
         void* userData = k_timer_user_data_get(timer);
         PacketLayer* self = static_cast<PacketLayer*>(userData);
         self->reset();
     }
+    #endif
 };

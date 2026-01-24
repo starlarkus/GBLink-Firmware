@@ -36,7 +36,7 @@ void EmuModule::execute()
             case NextSection::exit:
             {
                 m_cancel = false;
-                NVIC_EnableIRQ(USB_IRQn);
+                //NVIC_EnableIRQ(USB_IRQn);
                 return;
             }
         }

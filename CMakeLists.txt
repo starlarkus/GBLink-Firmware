@@ -6,9 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # The following resolves the Zephyr location using the ZEPHYR_BASE environment variable.
 # The `REQUIRED HINTS $ENV{ZEPHYR_BASE}` is optional in case you're not using `west zephyr-export`
 # https://docs.zephyrproject.org/latest/develop/west/zephyr-cmds.html#installing-cmake-packages-west-zephyr-export
-set(BOARD nucleo_f070rb)
 
-set(ZEPHYR_MODULES "${CMAKE_SOURCE_DIR}/modules/hal/stm32" "${CMAKE_SOURCE_DIR}/modules/hal/cmsis")
+#set(ZEPHYR_MODULES "${CMAKE_SOURCE_DIR}/modules/hal/stm32" "${CMAKE_SOURCE_DIR}/modules/hal/cmsis")
+set(ZEPHYR_MODULES "${CMAKE_SOURCE_DIR}/modules/hal/rpi_pico" "${CMAKE_SOURCE_DIR}/modules/hal/cmsis")
+
+set(BOARD rpi_pico)
+
 find_package(Zephyr REQUIRED HINTS "${CMAKE_SOURCE_DIR}/zephyr")
 
 

@@ -8,8 +8,14 @@ enum LinkMode
     SLAVE
 };
 
+struct NextTransmit
+{
+    uint16_t value;
+    uint32_t timingUs;
+};
+
 typedef void (*ReceiveHandler)(uint16_t rx, void* userData);
-typedef uint16_t (*TransmitHandler)(void* userData);
+typedef struct NextTransmit (*TransmitHandler)(void* userData);
 typedef void (*TransiveDoneHandler)(void* userData);
 
 void link_setTransmitCallback(TransmitHandler cb, void* userData);
@@ -23,5 +29,3 @@ void link_startTransive();
 enum LinkMode link_getMode();
 
 void link_changeMode(enum LinkMode mode);
-
-void link_reset();

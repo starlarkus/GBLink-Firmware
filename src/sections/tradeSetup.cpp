@@ -21,7 +21,7 @@ NextSection TradeSetup::process()
     {
         auto command = m_packetLayer.getCommand();
 
-        NVIC_EnableIRQ(USB_IRQn);
+        //NVIC_EnableIRQ(USB_IRQn);
         
         #ifdef CONFIG_SECTIONS_USE_MASTER_MODE
         if (m_blockState == BlockCommandState::RequestTrainerCard && m_packetLayer.idle())
@@ -100,7 +100,7 @@ NextSection TradeSetup::process()
             default: break;
         }
         k_sleep(K_MSEC(5));
-        NVIC_DisableIRQ(USB_IRQn);
+        //NVIC_DisableIRQ(USB_IRQn);
     }
     return NextSection::cancel; // user canceled from web interface
 }

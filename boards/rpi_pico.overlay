@@ -1,0 +1,23 @@
+#include <zephyr/dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>
+
+&pio0 {
+    status = "okay";
+
+    pio_link: piolink {
+        compatible = "raspberrypi,pico_link";
+        status = "okay";
+        pio = <&pio0>;
+        pinctrl-0 = <&pio0_pin_default>;
+        pinctrl-names = "default";
+    };
+};
+
+&pinctrl {
+    pio0_pin_default: pio0_pin_default {
+        link_pins {
+            pinmux = <PIO0_P8>, <PIO0_P9>, <PIO0_P10>, <PIO0_P11>;
+            bias-pull-up;
+            input-enable;
+        };
+    };
+};

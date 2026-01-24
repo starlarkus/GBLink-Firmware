@@ -15,7 +15,7 @@ NextSection TradeLounge::process()
     while (!m_cancel)
     {
         auto command = m_packetLayer.getCommand();
-        NVIC_EnableIRQ(USB_IRQn);
+        //NVIC_EnableIRQ(USB_IRQn);
 
         switch(command[0])
         {
@@ -58,7 +58,7 @@ NextSection TradeLounge::process()
         }
 
         k_sleep(K_MSEC(5));
-        NVIC_DisableIRQ(USB_IRQn);
+        //NVIC_DisableIRQ(USB_IRQn);
     }
     return NextSection::cancel; // user canceled from web interface
 }

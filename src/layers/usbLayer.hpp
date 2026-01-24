@@ -89,7 +89,7 @@ public:
         case USB_DC_RESUME:
             break;
         case USB_DC_CLEAR_HALT:
-            sys_reboot(SYS_REBOOT_WARM);
+            //sys_reboot(SYS_REBOOT_WARM);
         default:
             break;
         }

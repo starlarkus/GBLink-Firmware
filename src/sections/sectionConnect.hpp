@@ -12,7 +12,6 @@ namespace section
         {
             if (m_cancel) return;
         }
-        packetLayer.setMode(PacketLayer::Mode::master);
         packetLayer.enableHandshake();
         k_sleep(K_MSEC(500));
         packetLayer.connect();
@@ -25,7 +24,6 @@ namespace section
         {
             if (m_cancel) return;
         }
-        packetLayer.setMode(PacketLayer::Mode::slave);
         packetLayer.enableHandshake();
     }
 }

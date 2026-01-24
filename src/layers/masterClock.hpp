@@ -84,9 +84,10 @@ private:
         .user_data = this,
         .flags = 0
     };
-
-    const struct device* m_syncCounter = DEVICE_DT_GET(DT_CHILD(DT_NODELABEL(timers16), counter));
-    const struct device* m_transmissionCounter = DEVICE_DT_GET(DT_CHILD(DT_NODELABEL(timers17), counter));
+    
+    //FIXME only one timer
+    const struct device* m_syncCounter = DEVICE_DT_GET(DT_NODELABEL(timer));
+    const struct device* m_transmissionCounter = DEVICE_DT_GET(DT_NODELABEL(timer));
 
     bool m_syncEnabled = false;
     bool m_transmissionEnabled = false;

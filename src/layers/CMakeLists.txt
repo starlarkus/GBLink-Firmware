@@ -1,3 +1,5 @@
-zephyr_library_sources(linkLayer.c)
+zephyr_library_sources_ifdef(CONFIG_STM32F0 linkLayer_bitbang.c)
+zephyr_library_sources_ifdef(CONFIG_SOC_FAMILY_RPI_PICO linkLayer_pio.c)
+
 zephyr_library_sources(packetLayer.cpp)
 zephyr_library_sources(usbLayer.cpp)

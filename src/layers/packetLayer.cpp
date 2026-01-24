@@ -6,27 +6,41 @@ void PacketLayer::onTransiveDone()
     {
         case TransiveState::handshake:
             k_sem_give(&m_handshakeSemaphore);
+            m_timingUs = timingHandshake;
             if (m_receivedHandshake == LINK_MASTER_HANDSHAKE 
                 || m_transmitHandShake == LINK_MASTER_HANDSHAKE)
             {
                 m_state = TransiveState::crc;
+                m_timingUs = timingCommandBytes;
+                #ifdef CONFIG_STM32F0
                 if (m_mode == Mode::master) m_masterClock.startTransmissionSync();
+                #endif
             }
             break;
 
         case TransiveState::crc:
+            #ifdef CONFIG_STM32F0
             k_timer_start(&m_timeoutTimer, K_MSEC(14), K_NO_WAIT);
+            #endif
             m_state = TransiveState::command;
             m_crc = 0x00;
             break;
 
         case TransiveState::command:
             
+            if (m_commandIndex == 7)
+            {
+                m_timingUs = timingBetweenCommands;
+            }
+
             if (m_commandIndex != 8) return;
 
             m_commandIndex = 0;
             m_state = TransiveState::crc;
+            m_timingUs = timingCommandBytes;
+            #ifdef CONFIG_STM32F0
             k_timer_stop(&m_timeoutTimer);
+            #endif
             k_sem_give(&m_commandRxCompleteSemaphore);
             if (m_handler.transiveDone != nullptr && m_handler.transiveDone() == CommandState::done)
             {
@@ -50,5 +64,8 @@ void PacketLayer::reset()
     m_crc = LINK_SLAVE_HANDSHAKE;
     m_handler = emptyCommand();
     m_receivedCommand = {};
+    m_timingUs = timingHandshake;
+    #ifdef CONFIG_STM32F0
     m_masterClock.disableSync();
+    #endif
 }

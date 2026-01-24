@@ -1,0 +1,12 @@
+# A YAML binding matching the node
+
+compatible: "raspberrypi,pico_link"
+
+include: [base.yaml, pinctrl-device.yaml]
+
+properties:
+  pio:
+    type: phandle
+    required: true
+
+
