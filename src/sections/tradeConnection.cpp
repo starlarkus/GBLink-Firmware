@@ -17,7 +17,8 @@ void TradeConnection::handleInitialDataExchange()
 
     while (!m_cancel)
     {
-        auto command = m_packetLayer.getCommand();
+        auto result = m_packetLayer.awaitTransiveResults();
+        std::span<const uint16_t> command = result.received;
 
         //NVIC_EnableIRQ(USB_IRQn);
 
@@ -141,7 +142,8 @@ NextSection TradeConnection::handleTradeNegotiations()
 
     while(!m_cancel)
     {
-        auto command = m_packetLayer.getCommand();
+        auto result = m_packetLayer.awaitTransiveResults();
+        std::span<const uint16_t> command = result.received;
 
         //NVIC_EnableIRQ(USB_IRQn);
 

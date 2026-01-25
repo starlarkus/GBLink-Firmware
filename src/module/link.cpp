@@ -27,20 +27,18 @@ void LinkModule::execute()
     
     while (true)
     {
-        auto usbCommand = usbLink_loadTransivePacket();
+
+        PacketLayer::TransiveResult result = m_packetLayer.awaitTransiveResults();
 
         if (partnerReadyCloseLink && readyCloseLink)
         {   
-            //NVIC_EnableIRQ(USB_IRQn);
-
             if (keepAlive)
             {
                 sendLinkStatus(LinkStatus::LinkReconnecting);
                 m_packetLayer.disableHandshake();
-                k_sleep(K_MSEC(40));
                 m_packetLayer.reset(); // disable sync
                 m_packetLayer.setTransiveHandler(usbLinkCommand());
-                k_sleep(K_MSEC(300));
+                k_sleep(K_MSEC(400));
                 m_packetLayer.setMode(m_packetLayerMode); // enable sync again
                 establishConncection();
                 partnerReadyCloseLink = false;
@@ -54,34 +52,29 @@ void LinkModule::execute()
             
         }
 
-        auto linkCommand = m_packetLayer.getCommand();
+        UsbLayer::getInstance().sendData(std::span(reinterpret_cast<const uint8_t*>(result.received.data()), 16));
 
-        //NVIC_EnableIRQ(USB_IRQn);
-
-        UsbLayer::getInstance().sendData(std::span(reinterpret_cast<const uint8_t*>(linkCommand.data()), 16));
-
-        if ((linkCommand[0] == LINKCMD_SEND_HELD_KEYS) && (linkCommand[1] == LINK_KEY_CODE_EXIT_ROOM))
+        if ((result.received[0] == LINKCMD_SEND_HELD_KEYS) && (result.received[1] == LINK_KEY_CODE_EXIT_ROOM))
         {
             keepAlive = false;
         } 
 
-        if (usbCommand.has_value() && ((usbCommand.value()[0] == LINKCMD_SEND_HELD_KEYS) && (usbCommand.value()[1] == LINK_KEY_CODE_EXIT_ROOM)))
+        if (result.transmitted[0] == LINKCMD_SEND_HELD_KEYS && result.transmitted[1] == LINK_KEY_CODE_EXIT_ROOM)
         {
             keepAlive = false;
         }
 
-        if (linkCommand[0] == LINKCMD_READY_CLOSE_LINK)
+        if (result.received[0] == LINKCMD_READY_CLOSE_LINK)
         {
             partnerReadyCloseLink = true;
         }
 
-        if (usbCommand.has_value() && usbCommand.value()[0] == LINKCMD_READY_CLOSE_LINK)
+        if (result.transmitted[0] == LINKCMD_READY_CLOSE_LINK)
         {
             readyCloseLink = true;
         }
 
         k_sleep(K_MSEC(5));
-        //NVIC_DisableIRQ(USB_IRQn);
     }
 }
 

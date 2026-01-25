@@ -36,12 +36,13 @@ void PacketLayer::onTransiveDone()
             if (m_commandIndex != 8) return;
 
             m_commandIndex = 0;
+            m_transmitCommandIndex = 0;
             m_state = TransiveState::crc;
             m_timingUs = timingCommandBytes;
             #ifdef CONFIG_STM32F0
             k_timer_stop(&m_timeoutTimer);
             #endif
-            k_sem_give(&m_commandRxCompleteSemaphore);
+            k_sem_give(&m_commandTransiveSemaphore);
             if (m_handler.transiveDone != nullptr && m_handler.transiveDone() == CommandState::done)
             {
                 m_idle = true;

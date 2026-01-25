@@ -3,7 +3,6 @@
 #include "hardware/pio.h"
 
 #include "zephyr/drivers//misc/pio_rpi_pico/pio_rpi_pico.h"
-#include "zephyr/kernel.h"
 #include <zephyr/drivers/pinctrl.h>
 
 #define TX_RX_DONE_IRQ 0
@@ -102,6 +101,7 @@ uint16_t reverse_bit16(uint16_t x)
 uint16_t value = 0x00;
 static void pioIsr_done(const void* arg)
 {
+    (void)arg;
     uint16_t rxData = pio_sm_get(g_pio, g_sm);
     rxData = reverse_bit16(rxData);
     if (g_receiveCallback) g_receiveCallback(rxData, g_receiveUserData);
@@ -111,6 +111,7 @@ static void pioIsr_done(const void* arg)
 
 static void pioIsr_tx(const void* arg)
 {
+    (void)arg;
     struct NextTransmit txValue = 
     {
         0xDEAD, 
@@ -174,26 +175,27 @@ static void link_configureMaster()
 
     #pragma push_macro("pio0")
     #undef pio0
-    uint32_t dataPin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 0);
+    uint32_t SD_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 0);
+    uint32_t SC_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 1);
+    uint32_t SO_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 2);
+    uint32_t SI_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 3);
     #pragma pop_macro("pio0")
     
-    sm_config_set_out_pins(&sm_config, dataPin, 1);
-    sm_config_set_set_pins(&sm_config, dataPin, 4);
-    sm_config_set_in_pins(&sm_config, dataPin);
-    sm_config_set_jmp_pin(&sm_config, dataPin);
+    sm_config_set_out_pins(&sm_config, SD_pin, 1);
+    sm_config_set_set_pins(&sm_config, SD_pin, 4);
+    sm_config_set_in_pins(&sm_config, SD_pin);
+    sm_config_set_jmp_pin(&sm_config, SD_pin);
 
     sm_config_set_out_shift(&sm_config, true, false, 0);
     sm_config_set_in_shift(&sm_config, false, false, 0);
 
-    pio_gpio_init(g_pio, dataPin);
-    pio_gpio_init(g_pio, 9);
-    pio_gpio_init(g_pio, 10);
-    pio_gpio_init(g_pio, 11);
+    pio_gpio_init(g_pio, SD_pin);
+    pio_gpio_init(g_pio, SC_pin);
+    pio_gpio_init(g_pio, SO_pin);
+    pio_gpio_init(g_pio, SI_pin);
 
-    // clk divider
 	sm_config_set_clkdiv(&sm_config, 67.816f); // ~540 ns per inst, 16 inst equal baud 115200
 
-    // wrap
 	sm_config_set_wrap(&sm_config,
 			   offset + RPI_PICO_PIO_GET_WRAP_TARGET(pio_master_fw),
 			   offset + RPI_PICO_PIO_GET_WRAP(pio_master_fw));
@@ -233,10 +235,8 @@ static void link_configureSlave()
     pio_gpio_init(g_pio, SO_pin);
     pio_gpio_init(g_pio, SI_pin);
 
-    // clk divider
 	sm_config_set_clkdiv(&sm_config, 67.816f); // ~540 ns per inst, 16 inst equal baud 115200
 
-    // wrap
 	sm_config_set_wrap(&sm_config,
 			   offset + RPI_PICO_PIO_GET_WRAP_TARGET(pio_slave_fw),
 			   offset + RPI_PICO_PIO_GET_WRAP(pio_slave_fw));

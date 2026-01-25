@@ -1,4 +1,5 @@
 
+#include <cstdint>
 extern "C"
 {
     #include "linkLayer.h"
@@ -25,6 +26,12 @@ public:
         slave
     };
 
+    struct TransiveResult
+    {
+        std::span<const uint16_t> received;
+        std::span<const uint16_t> transmitted;
+    };
+
 private:
 
     enum class TransiveState
@@ -45,7 +52,7 @@ public:
         link_setReceiveCallback(&receiveCallback, this);
         link_setTransiveDoneCallback(&transiveDoneCallback, this);
         
-        k_sem_init(&m_commandRxCompleteSemaphore, 0, 1);
+        k_sem_init(&m_commandTransiveSemaphore, 0, 1);
         k_sem_init(&m_handshakeSemaphore, 0, 1);
         #ifdef CONFIG_STM32F0
         k_timer_init(&m_timeoutTimer, &packetTimeout, nullptr);
@@ -60,10 +67,14 @@ public:
         if (handler.init != nullptr) handler.init(handler.userData);
     }
     
-    std::span<const uint16_t, 8> getCommand() 
+    TransiveResult awaitTransiveResults() 
     { 
-        k_sem_take(&m_commandRxCompleteSemaphore, K_FOREVER);
-        return std::span(m_receivedCommand); 
+        k_sem_take(&m_commandTransiveSemaphore, K_FOREVER);
+        return TransiveResult
+        {
+            std::span(m_receivedCommand),
+            std::span(m_transmittedCommand)
+        };
     }
 
     uint16_t getReceivedHandshake()
@@ -181,9 +192,11 @@ private:
 
     uint16_t transmitCommand()
     {
-        uint16_t m_transmittedBytes = (m_handler.transive != nullptr) ? m_handler.transive() : 0x00;
-        m_crc += m_transmittedBytes;
-        return m_transmittedBytes;
+        uint16_t txBytes = (m_handler.transive != nullptr) ? m_handler.transive() : 0x00;
+        m_crc += txBytes;
+        m_transmittedCommand[m_transmitCommandIndex] = txBytes;
+        m_transmitCommandIndex++;
+        return txBytes;
     }
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
@@ -205,11 +218,13 @@ private:
 
     uint32_t m_timingUs = 0;
 
-    struct k_sem m_commandRxCompleteSemaphore;
+    struct k_sem m_commandTransiveSemaphore;
     struct k_sem m_handshakeSemaphore;
 
     int m_commandIndex = 0;
     std::array<uint16_t, 8> m_receivedCommand = {};
+    int m_transmitCommandIndex = 0;
+    std::array<uint16_t, 8> m_transmittedCommand = {};
 
     TransiveStruct m_handler = emptyCommand();
     TransiveState m_state = TransiveState::handshake;

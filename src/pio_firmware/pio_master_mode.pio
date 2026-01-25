@@ -14,7 +14,7 @@ set pindirs, 0b111
 set pins, 0b111 ; pins SO | SC | SD
 
 wait_till_next_transmission:
-    jmp y-- wait_till_next_transmission ; wait to next transmission
+    jmp y-- wait_till_next_transmission
 
 irq TX_VALUE_FLAG
 
