@@ -1,6 +1,5 @@
 #include <zephyr/kernel.h>
 #include "TransiveStruct.hpp"
-#include <optional>
 
 TransiveStruct usbLinkCommand();
 

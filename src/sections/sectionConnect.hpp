@@ -14,7 +14,7 @@ namespace section
         }
         packetLayer.enableHandshake();
         k_sleep(K_MSEC(500));
-        packetLayer.connect();
+        packetLayer.connectHandshake();
     }
 
     inline void connectAsSlave(PacketLayer& packetLayer, bool& m_cancel)

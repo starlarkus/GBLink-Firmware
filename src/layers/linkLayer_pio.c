@@ -98,14 +98,14 @@ uint16_t reverse_bit16(uint16_t x)
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-uint16_t value = 0x00;
+uint16_t g_lastTxValue = 0x00;
 static void pioIsr_done(const void* arg)
 {
     (void)arg;
     uint16_t rxData = pio_sm_get(g_pio, g_sm);
     rxData = reverse_bit16(rxData);
     if (g_receiveCallback) g_receiveCallback(rxData, g_receiveUserData);
-    if (g_transiveDoneCallback) g_transiveDoneCallback(g_transiveDoneUserdata);
+    if (g_transiveDoneCallback) g_transiveDoneCallback(rxData, g_lastTxValue, g_transiveDoneUserdata);
     pio_interrupt_clear(g_pio, TX_RX_DONE_IRQ);
 }
 
@@ -121,6 +121,7 @@ static void pioIsr_tx(const void* arg)
     if (g_transmitCallback) txValue = g_transmitCallback(g_transmitUserData);
     if (g_mode == MASTER) pio_sm_put(g_pio, g_sm, txValue.timingUs);
     pio_sm_put(g_pio, g_sm, txValue.value);
+    g_lastTxValue = txValue.value;
     pio_interrupt_clear(g_pio, TX_VALUE_IRQ);
     return;
 }
@@ -169,6 +170,8 @@ static void link_configureMaster()
     g_mode = MASTER;
     pio_sm_set_enabled(g_pio, g_sm, false);
     pio_clear_instruction_memory(g_pio);
+    pio_sm_restart(g_pio, g_sm);
+    pio_sm_clear_fifos(g_pio, g_sm);
 
 	uint32_t offset = pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_master_fw));
 	pio_sm_config sm_config = pio_get_default_sm_config();
@@ -211,6 +214,8 @@ static void link_configureSlave()
     g_mode = SLAVE;
     pio_sm_set_enabled(g_pio, g_sm, false);
     pio_clear_instruction_memory(g_pio);
+    pio_sm_restart(g_pio, g_sm);
+    pio_sm_clear_fifos(g_pio, g_sm);
 
 	uint32_t offset = pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_slave_fw));
 	pio_sm_config sm_config = pio_get_default_sm_config();
@@ -245,6 +250,13 @@ static void link_configureSlave()
 	pio_sm_set_enabled(g_pio, g_sm, true);
 }
 
+static void link_disablePio()
+{
+    g_mode = DISABLED;
+    pio_sm_set_enabled(g_pio, g_sm, false);
+    pio_clear_instruction_memory(g_pio);
+}
+
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
 void link_changeMode(enum LinkMode mode)
@@ -257,6 +269,8 @@ void link_changeMode(enum LinkMode mode)
         case MASTER:
             link_configureMaster();
             break;
+        case DISABLED:
+            link_disablePio();
     }   
 }
 

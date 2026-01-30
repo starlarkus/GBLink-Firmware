@@ -84,7 +84,7 @@ NextSection TradeDisconnect::handleDisconnect()
             {
                 m_packetLayer.setTransiveHandler(readyCloseLinkCommand());
                 k_sleep(K_MSEC(40));
-                m_packetLayer.reset();
+                //m_packetLayer.reset();
                 k_sleep(K_MSEC(400));
                 return NextSection::connection;
             }

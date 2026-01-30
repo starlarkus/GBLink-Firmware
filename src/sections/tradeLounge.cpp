@@ -50,7 +50,7 @@ NextSection TradeLounge::process()
             {
                 m_packetLayer.setTransiveHandler(readyCloseLinkCommand());
                 k_sleep(K_MSEC(40));
-                m_packetLayer.reset(); //master
+                //m_packetLayer.reset(); //master
                 k_sleep(K_MSEC(200));
                 return nextSection;
             }

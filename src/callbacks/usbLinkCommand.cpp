@@ -25,6 +25,11 @@ static uint16_t usbLinkTransive()
 {
     if (!g_packetAvailable) return 0x00;
     uint16_t ret = g_packet[g_index];
+
+    // TODO Why does this happen? Only observed on Reconnect and is concistent, so no random flip
+    if (g_index == 0 && g_packet[0] == 0xFF06) ret = 0x5FFF;
+
+    
     g_index++;
     if (g_index == 8)
     {

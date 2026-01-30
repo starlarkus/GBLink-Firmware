@@ -41,6 +41,13 @@ private:
         handshake
     };
 
+    enum class HandShakeState
+    {
+        disabled,
+        enabled,
+        connect
+    };
+
     static constexpr uint32_t timingHandshake = 30097;
     static constexpr uint32_t timingCommandBytes = 1378;
     static constexpr uint32_t timingBetweenCommands = 12953;
@@ -54,10 +61,16 @@ public:
         
         k_sem_init(&m_commandTransiveSemaphore, 0, 1);
         k_sem_init(&m_handshakeSemaphore, 0, 1);
+        k_sem_init(&m_saveToDisableSemaphore, 0, 1);
         #ifdef CONFIG_STM32F0
         k_timer_init(&m_timeoutTimer, &packetTimeout, nullptr);
         k_timer_user_data_set(&m_timeoutTimer, this);
         #endif
+    }
+
+    ~PacketLayer()
+    {
+        awaitDisable();
     }
 
     void setTransiveHandler(struct TransiveStruct handler)
@@ -88,24 +101,18 @@ public:
         m_waiting = 1;
         k_sem_take(&m_handshakeSemaphore, K_FOREVER);
         m_waiting = 0;
-        return m_transmitHandShake;
+        return m_transmitedHandShake;
     }
 
     void cancel() {  if (m_waiting == 1) k_sem_give(&m_handshakeSemaphore); }
 
     bool idle() { return m_idle; }
 
-    void enableHandshake() { m_transmitHandShake = LINK_SLAVE_HANDSHAKE; }
+    void enableHandshake() { m_handshakeState = HandShakeState::enabled; }
 
-    void disableHandshake() { m_transmitHandShake = LINK_HANDSHAKE_DISABLE; }
+    void connectHandshake() { m_handshakeState = HandShakeState::connect; }
 
-    void connect() { m_transmitHandShake = LINK_MASTER_HANDSHAKE; }
-
-    bool isHandshakeEnabled() { return m_transmitHandShake == LINK_SLAVE_HANDSHAKE; }
-
-    bool hasSendHandShake() { return m_receivedHandshake == LINK_SLAVE_HANDSHAKE; }
-
-    void reset();
+    bool isHandshakeEnabled() { return m_transmitedHandShake == LINK_SLAVE_HANDSHAKE; }
 
     void setMode(Mode mode) 
     {   
@@ -132,6 +139,8 @@ public:
     Mode getMode() { return m_mode; }
 
 private:
+
+    bool awaitDisable();
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
@@ -166,7 +175,16 @@ private:
 
     uint16_t transmitHandshake()
     {
-        return m_transmitHandShake;
+        // Don't set m_transmitedHandShake from outside to advance handshake state
+        // Setting m_transmitedHandShake will create race conditions bad things happen
+        switch(m_handshakeState)
+        {
+            case HandShakeState::disabled: return LINK_HANDSHAKE_DISABLE;
+            case HandShakeState::enabled: return LINK_SLAVE_HANDSHAKE;
+            case HandShakeState::connect: return LINK_MASTER_HANDSHAKE;
+        }
+
+        return 0xDEAD;
     }
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
@@ -201,25 +219,26 @@ private:
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-    void onTransiveDone();
+    void onTransiveDone(uint16_t rxBytes, uint16_t txBytes);
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
 private:
     atomic_t m_waiting = 0;
+    atomic_t m_waitForDisable = 0;
 
     bool m_idle = true;
     Mode m_mode = Mode::slave;
 
-    uint16_t m_handshakeCount = 0;
     uint16_t m_receivedHandshake = LINK_HANDSHAKE_DISABLE;
-    uint16_t m_transmitHandShake = LINK_HANDSHAKE_DISABLE;
+    uint16_t m_transmitedHandShake = LINK_HANDSHAKE_DISABLE;
     uint16_t m_crc = LINK_SLAVE_HANDSHAKE; //first crc is always handshake
 
     uint32_t m_timingUs = 0;
 
     struct k_sem m_commandTransiveSemaphore;
     struct k_sem m_handshakeSemaphore;
+    struct k_sem m_saveToDisableSemaphore;
 
     int m_commandIndex = 0;
     std::array<uint16_t, 8> m_receivedCommand = {};
@@ -228,6 +247,7 @@ private:
 
     TransiveStruct m_handler = emptyCommand();
     TransiveState m_state = TransiveState::handshake;
+    HandShakeState m_handshakeState = HandShakeState::disabled;
 
     struct k_timer m_timeoutTimer;
     #ifdef CONFIG_STM32F0
@@ -249,10 +269,10 @@ private:
         return self->onTransmit();
     }
 
-    static void transiveDoneCallback(void* userData)
+    static void transiveDoneCallback(uint16_t rxBytes, uint16_t txBytes, void* userData)
     {
         PacketLayer* self = static_cast<PacketLayer*>(userData);
-        self->onTransiveDone();
+        self->onTransiveDone(rxBytes, txBytes);
     }
 
     #ifdef CONFIG_STM32F0

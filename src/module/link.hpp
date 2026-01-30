@@ -1,8 +1,9 @@
 #include <zephyr/kernel.h>
-#include "../layers/packetLayer.hpp"
+#include "../sections//usbSection.hpp"
 
 class LinkModule
 {
+private:
     enum class LinkModeCommand : uint8_t
     {
         SetModeMaster = 0x10,
@@ -12,9 +13,8 @@ class LinkModule
     };
 
 public:
-    LinkModule(PacketLayer& packetLayer) : m_packetLayer(packetLayer)
+    LinkModule()
     {
-        m_packetLayer.disableHandshake();
         k_sem_init(&m_waitForLinkModeCommand, 0, 1);
     }
 
@@ -25,14 +25,10 @@ public:
     void receiveCommand(std::span<const uint8_t> command);
 
 private:
-    void establishConncection();
 
-    void reestablishConnection();
-
-    PacketLayer& m_packetLayer;
-
-    struct k_event m_connectEvent;
     struct k_sem m_waitForLinkModeCommand;
+
+    UsbSection* m_currentSection = nullptr;
     PacketLayer::Mode m_packetLayerMode = PacketLayer::Mode::slave;
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//

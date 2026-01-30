@@ -94,7 +94,7 @@ NextSection TradeSetup::process()
             case LINKCMD_READY_CLOSE_LINK:
                 m_packetLayer.setTransiveHandler(readyCloseLinkCommand());
                 k_sleep(K_MSEC(40));
-                m_packetLayer.reset(); //master
+                //m_packetLayer.reset(); //master
                 k_sleep(K_MSEC(300));
                 return nextSection;
             

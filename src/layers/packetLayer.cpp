@@ -1,14 +1,20 @@
 #include "packetLayer.hpp"
+#include "linkLayer.h"
+#include "syscalls/kernel.h"
+#include <cerrno>
 
-void PacketLayer::onTransiveDone()
+void PacketLayer::onTransiveDone(uint16_t rxBytes, uint16_t txBytes)
 {
     switch (m_state)
     {
         case TransiveState::handshake:
+            m_transmitedHandShake = txBytes;
+            m_receivedHandshake = rxBytes;
             k_sem_give(&m_handshakeSemaphore);
             m_timingUs = timingHandshake;
-            if (m_receivedHandshake == LINK_MASTER_HANDSHAKE 
-                || m_transmitHandShake == LINK_MASTER_HANDSHAKE)
+
+            if (rxBytes == LINK_MASTER_HANDSHAKE 
+                || txBytes == LINK_MASTER_HANDSHAKE)
             {
                 m_state = TransiveState::crc;
                 m_timingUs = timingCommandBytes;
@@ -43,6 +49,11 @@ void PacketLayer::onTransiveDone()
             k_timer_stop(&m_timeoutTimer);
             #endif
             k_sem_give(&m_commandTransiveSemaphore);
+            if (m_waitForDisable >= 1)
+            {
+                m_waitForDisable = 0;
+                k_sem_give(&m_saveToDisableSemaphore);
+            } 
             if (m_handler.transiveDone != nullptr && m_handler.transiveDone() == CommandState::done)
             {
                 m_idle = true;
@@ -54,19 +65,16 @@ void PacketLayer::onTransiveDone()
     }
 }
 
-void PacketLayer::reset()
+bool PacketLayer::awaitDisable()
 {
-    m_state = TransiveState::handshake;
-    m_idle = true;
-    m_commandIndex = 0;
-    m_receivedHandshake = LINK_HANDSHAKE_DISABLE;
-    m_transmitHandShake = LINK_HANDSHAKE_DISABLE;
-    m_handshakeCount = 0;
-    m_crc = LINK_SLAVE_HANDSHAKE;
-    m_handler = emptyCommand();
-    m_receivedCommand = {};
-    m_timingUs = timingHandshake;
-    #ifdef CONFIG_STM32F0
-    m_masterClock.disableSync();
-    #endif
+    // As slave, just disable since we can't gurantee that the command will be completed
+    // As master, let's shutdown gracefully and wait for last command to complete
+    if (m_mode == Mode::master)
+    {
+        m_waitForDisable = 1;
+        if (k_sem_take(&m_saveToDisableSemaphore, K_MSEC(100)) == -EAGAIN) return false;
+    }
+    
+    link_changeMode(DISABLED);
+    return true;
 }

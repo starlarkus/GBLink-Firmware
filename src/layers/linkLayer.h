@@ -5,7 +5,8 @@
 enum LinkMode
 {
     MASTER,
-    SLAVE
+    SLAVE,
+    DISABLED
 };
 
 struct NextTransmit
@@ -16,7 +17,7 @@ struct NextTransmit
 
 typedef void (*ReceiveHandler)(uint16_t rx, void* userData);
 typedef struct NextTransmit (*TransmitHandler)(void* userData);
-typedef void (*TransiveDoneHandler)(void* userData);
+typedef void (*TransiveDoneHandler)(uint16_t rx, uint16_t tx, void* userData);
 
 void link_setTransmitCallback(TransmitHandler cb, void* userData);
 

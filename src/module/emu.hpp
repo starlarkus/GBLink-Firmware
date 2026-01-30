@@ -6,10 +6,7 @@
 class EmuModule
 {
 public:
-    EmuModule(PacketLayer& packetLayer) : m_packetLayer(packetLayer)
-    {
-        m_packetLayer.disableHandshake();
-    }
+    EmuModule() {}
     
     void execute();
 
@@ -20,10 +17,8 @@ public:
     void cancel() 
     { 
         m_cancel = true;
-        m_packetLayer.cancel();
     }
 
 private:
     bool m_cancel = false;
-    PacketLayer& m_packetLayer;
 };
