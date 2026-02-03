@@ -12,8 +12,9 @@ void UsbSection::establishConncection()
 
     sendLinkStatus(LinkStatus::HandshakeReceived);
 
-    while (!m_packetLayer.isHandshakeEnabled()) 
+    while (!m_packetLayer.isHandshakeEnabled())
     { 
+        k_sleep(K_MSEC(50));
         if (m_cancel) return; 
     }
 
@@ -75,4 +76,6 @@ bool UsbSection::process()
             return keepAlive;
         }
     }
+
+    return false;
 }
