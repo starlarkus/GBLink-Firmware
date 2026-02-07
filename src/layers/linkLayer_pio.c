@@ -61,7 +61,7 @@ RPI_PICO_PIO_DEFINE_PROGRAM(pio_master_fw, 0, 26,
 
 RPI_PICO_PIO_DEFINE_PROGRAM(pio_slave_fw, 0, 18,
                 //     .wrap_target
-    0xe001, //  0: set    pins, 1                    
+    0xe008, //  0: set    pins, 8                    
     0xe084, //  1: set    pindirs, 4                 
     0xe02f, //  2: set    x, 15                      
     0x2020, //  3: wait   0 pin, 0                   
@@ -69,15 +69,15 @@ RPI_PICO_PIO_DEFINE_PROGRAM(pio_slave_fw, 0, 18,
     0x4e01, //  5: in     pins, 1                [14]
     0x0045, //  6: jmp    x--, 5                     
     0x8020, //  7: push   block                      
-    0xe001, //  8: set    pins, 1                    
-    0xe085, //  9: set    pindirs, 5                 
+    0xe008, //  8: set    pins, 8                    
+    0xe08c, //  9: set    pindirs, 12                
     0xbf42, // 10: nop                           [31]
     0xe02f, // 11: set    x, 15                      
     0x80a0, // 12: pull   block                      
     0xf000, // 13: set    pins, 0                [16]
     0x6e01, // 14: out    pins, 1                [14]
     0x004e, // 15: jmp    x--, 14                    
-    0xf001, // 16: set    pins, 1                [16]
+    0xf008, // 16: set    pins, 8                [16]
     0xc000, // 17: irq    nowait 0                   
     0xbf42, // 18: nop                           [31]
             //     .wrap
@@ -296,7 +296,7 @@ static int link_init()
 
     int ret = pinctrl_apply_state(config, PINCTRL_STATE_DEFAULT);
 
-    link_configureSlave();
+    link_disablePio();
 
     return ret;
 }
