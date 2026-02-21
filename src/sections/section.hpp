@@ -1,6 +1,7 @@
 
 #include "../layers/packetLayer.hpp"
 #include "nextSectionState.hpp"
+#include "syscalls/kernel.h"
 
 #pragma once 
 
@@ -19,13 +20,14 @@ public:
 
 protected:
     virtual NextSection process() = 0;
-    
+
     inline void connectAsMaster()
     {
         m_packetLayer.setMode(PacketLayer::Mode::master);
 
         while(m_packetLayer.getReceivedHandshake() != LINK_SLAVE_HANDSHAKE) 
         {
+            k_sleep(K_MSEC(50));
             if (m_cancel) return;
         }
 
@@ -40,6 +42,7 @@ protected:
 
         while(m_packetLayer.getReceivedHandshake() != LINK_SLAVE_HANDSHAKE) 
         {
+            k_sleep(K_MSEC(50));
             if (m_cancel) return;
         }
 
