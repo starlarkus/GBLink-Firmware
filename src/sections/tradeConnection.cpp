@@ -12,7 +12,7 @@ extern "C"
 
 void TradeConnection::handleInitialDataExchange()
 {
-   
+    connectAsMaster();
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE_CONNECTING));
 
     while (!m_cancel)

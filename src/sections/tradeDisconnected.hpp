@@ -21,10 +21,7 @@ class TradeDisconnect : public Section
     NextSection handleDisconnect();
 
 public:
-    TradeDisconnect()
-    {
-        connectAsMaster();
-    }
+    TradeDisconnect() {}
 
     ~TradeDisconnect()
     {

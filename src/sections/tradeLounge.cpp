@@ -9,6 +9,7 @@ extern "C"
 
 NextSection TradeLounge::process()
 {
+    connectAsMaster();
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE));
     NextSection nextSection = NextSection::connection;
 

@@ -13,6 +13,12 @@ extern "C"
 NextSection TradeSetup::process()
 {
     #ifdef CONFIG_SECTIONS_USE_MASTER_MODE
+    connectAsMaster();
+    #else
+    connectAsSlave();
+    #endif
+
+    #ifdef CONFIG_SECTIONS_USE_MASTER_MODE
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(m_linkType));
     #endif
     NextSection nextSection = NextSection::connection;

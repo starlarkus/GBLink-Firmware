@@ -19,10 +19,7 @@ class TradeLounge : public Section
     };
 
 public:
-    TradeLounge()
-    {
-        connectAsMaster();
-    }
+    TradeLounge() {}
 
     ~TradeLounge()
     {

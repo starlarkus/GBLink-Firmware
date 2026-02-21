@@ -19,14 +19,7 @@ class TradeSetup : public Section
     };
 
 public:
-    TradeSetup(uint16_t linkType) : m_linkType(linkType)
-    {
-        #ifdef CONFIG_SECTIONS_USE_MASTER_MODE
-        connectAsMaster();
-        #else
-        connectAsSlave();
-        #endif
-    }
+    TradeSetup(uint16_t linkType) : m_linkType(linkType) {}
 
     ~TradeSetup()
     {

@@ -10,6 +10,7 @@ extern "C"
 
 void TradeDisconnect::exchangeTrainerData()
 {
+    connectAsMaster();
     m_packetLayer.setTransiveHandler(sendLinkTypeCommand(LINKTYPE_TRADE_DISCONNECTED));
 
     while(!m_cancel)

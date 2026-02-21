@@ -29,7 +29,6 @@ class TradeConnection : public Section
 public:
     TradeConnection()
     {
-        connectAsMaster();
         k_timer_init(&m_commandRequestTimer, requestBlockCommand, NULL);
         k_timer_user_data_set(&m_commandRequestTimer, this);
     }
