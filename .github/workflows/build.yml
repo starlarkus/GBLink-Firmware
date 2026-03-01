@@ -11,29 +11,42 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ZEPHYR_SDK_VERSION: 0.16.8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          path: gblink-firmware
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install west
-        run: pip install west
+      - name: Install dependencies
+        run: |
+          pip install west
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ccache ninja-build gperf
 
       - name: Initialize west workspace
         run: |
-          cd ..
-          west init -l GBLink-Firmware
+          west init -l gblink-firmware
           west update
 
       - name: Install Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        run: |
+          wget -q https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${ZEPHYR_SDK_VERSION}/zephyr-sdk-${ZEPHYR_SDK_VERSION}_linux-x86_64_minimal.tar.xz
+          tar xf zephyr-sdk-${ZEPHYR_SDK_VERSION}_linux-x86_64_minimal.tar.xz
+          cd zephyr-sdk-${ZEPHYR_SDK_VERSION}
+          ./setup.sh -t arm-zephyr-eabi -c
+
+      - name: Install Zephyr Python dependencies
+        run: pip install -r zephyr/scripts/requirements.txt
 
       - name: Build firmware
-        run: west build -b rpi_pico
+        run: west build -b rpi_pico gblink-firmware
 
       - name: Rename firmware
         run: cp build/zephyr/zephyr.uf2 gblink.uf2
