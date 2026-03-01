@@ -18,4 +18,28 @@ menu "Application Options"
     help
         Enable support for Game Boy link communication.
         This adds the GB SPI passthrough and printer modes.
+
+    config GB_LINK_DRIVE_SD_LOW
+    bool "Drive SD pin LOW in GB link mode (generic GBC cable GBA support)"
+    default n
+    depends on GB_LINK_MODE_ENABLED
+    help
+        Drive the SD pin (pin 4 of the link connector) LOW whenever GB link
+        mode is active.
+
+        OEM GBC link cables leave pin 4 unconnected, so this has no effect
+        on them. Generic GBC cables wire all 6 pins through, including pin 4,
+        which means the SD signal actually reaches the GBA.
+
+        The GBA reads SIOCNT bit 3 (SD state) to detect whether an external
+        clock master is present. With SD floating HIGH (the default when this
+        option is off) the GBA may not recognise the adapter as the master,
+        causing GBA-mode transfers to fail. Driving SD LOW tells the GBA that
+        an external device is driving the clock, which is the correct state
+        when the adapter is acting as SPI master.
+
+        Enable this option when using a generic GBC cable to connect to a GBA
+        (e.g. for Gen 3 trading or multiboot). Safe to leave enabled even with
+        OEM cables or original GB/GBC hardware — those devices either ignore
+        the SD pin or treat SD LOW as a valid "external master" signal.
 endmenu

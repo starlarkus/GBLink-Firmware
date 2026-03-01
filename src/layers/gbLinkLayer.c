@@ -39,6 +39,16 @@ void gb_link_init(void)
 {
     if (g_gb_initialized) return;
 
+#if defined(CONFIG_GB_LINK_DRIVE_SD_LOW)
+    // Drive SD (pin 4) LOW to signal to the GBA that an external clock master
+    // is present (SIOCNT bit 3 = SD state). Required for generic GBC cables
+    // where pin 4 is physically wired through to the GBA. OEM GBC cables
+    // leave pin 4 unconnected so this has no effect on them.
+    gpio_init(PIN_SD);
+    gpio_set_dir(PIN_SD, GPIO_OUT);
+    gpio_put(PIN_SD, 0);
+#endif
+
     // Get pio0 from device tree (same PIO block as GBA link)
     const struct device* dev = DEVICE_DT_GET(DT_PROP(DT_NODELABEL(pio_link), pio));
 
@@ -112,6 +122,13 @@ void gb_link_deinit(void)
     pio_clear_instruction_memory(g_gb_pio);
     pio_sm_restart(g_gb_pio, g_gb_sm);
     pio_sm_clear_fifos(g_gb_pio, g_gb_sm);
+
+#if defined(CONFIG_GB_LINK_DRIVE_SD_LOW)
+    // Release SD back to input with pull-up (restores the pinctrl default
+    // state so GBA_LINK and GBA_TRADE_EMU modes can take over the pin via PIO)
+    gpio_init(PIN_SD);
+    gpio_pull_up(PIN_SD);
+#endif
 
     g_gb_initialized = false;
 }
