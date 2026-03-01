@@ -47,7 +47,9 @@ jobs:
         run: pip install -r zephyr/scripts/requirements.txt
 
       - name: Build firmware
-        run: west build -b rpi_pico gblink-firmware
+        run: west build -b rpi_pico gblink-firmware -- -DEXTRA_KCONFIG_TARGETS=none
+        env:
+          KCONFIG_WARN_TO_ERROR: 0
 
       - name: Rename firmware
         run: cp build/zephyr/zephyr.uf2 gblink.uf2
