@@ -56,9 +56,10 @@ The onboard WS2812 RGB LED (GP16) indicates the current status:
 
 | Color | Status |
 |:---|:---|
-| **Red** | Disconnected — Device powered, USB not enumerated |
-| **Green** | Mounted — USB connected to host |
-| **Blue** | Active — WebUSB session active |
+| **Red** | Power — Device powered, no data connection |
+| **Green** | Connected — USB connected to host |
+| **Yellow** | GBA Mode — Game Boy Advance link active |
+| **Blue** | GB/GBC Mode — Game Boy or Game Boy Color link active |
 | **Purple** | Printer Mode — GB Printer emulation active |
 
 LED color can also be set via USB command (`0x42`).
