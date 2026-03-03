@@ -90,12 +90,6 @@ Commands are sent over the WebUSB command endpoint:
 
 ---
 
-## Testing
-
-Open `test/test.html` in Chrome to test via WebUSB
-
----
-
 ## Troubleshooting
 
 - When refreshing the web page, the USB device may need to be reset (unplug or press reset button).
