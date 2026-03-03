@@ -2,7 +2,7 @@
 
 This firmware turns an RP2040 into a USB-to-Game Boy Link Cable adapter supporting both **Game Boy (Gen 1/2)** and **Game Boy Advance** communication over WebUSB.
 
-**Firmware version:** 2.0.0
+This is forked from the Celio Firmware and allows for 
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ This firmware turns an RP2040 into a USB-to-Game Boy Link Cable adapter supporti
 
 ## Hardware Required
 
-* **USB Adapter Board:** Raspberry Pi Pico or Waveshare RP2040-Zero, Solderless board in development.
+* **USB Adapter Board:** Raspberry Pi Pico or Waveshare RP2040-Zero, Solderless board in development. Pre built DIY adapter or kits are avalible on Etsy. https://www.etsy.com/listing/1517956485/gb-link-usb-to-gameboy-link-adapter-for 
 
 ### Wiring Guide
 
