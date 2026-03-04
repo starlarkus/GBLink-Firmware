@@ -2,7 +2,7 @@
 
 This firmware turns an RP2040 into a USB-to-Game Boy Link Cable adapter supporting both **Game Boy (Gen 1/2)** and **Game Boy Advance** communication over WebUSB.
 
-This is forked from Celio Firmware from the CelioLink project and adds the functionality of the GBLink Reconfigurable to allow for Tetris, Pokemon gen1-3 trading. Sending multiboot files to GBA, GB Printer emulator as well as the Celio Gen3 modes for direct gen3 GBA link.
+This is forked from Celio Firmware from the CelioLink project and adds the functionality from GBLink Reconfigurable to allow for Tetris, Pokemon gen1-3 trading. Sending multiboot files to GBA, GB Printer emulator, as well as the Celio Gen3 modes for direct gen3 GBA link.
 
 ## Quick Start
 
