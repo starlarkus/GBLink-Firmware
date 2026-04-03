@@ -27,17 +27,12 @@ static enum LinkMode g_mode = SLAVE;
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-/* SET-instruction pin values.  SD position depends on cable type.
+/* SET-instruction pin values.  PIO programs are compiled with SD on GP3
+ * (GBA cable default).  When a GBC cable is detected at runtime, the
+ * instructions are patched in PIO memory to move SD to GP4 (bit 4).
  *   bit 0 = SC  (GP0)       bit 1 = SI  (GP1, always input)
- *   bit 2 = SO  (GP2)       bit 3 = GP3 (SD for GBA cable)
- *   bit 4 = GP4 (SD for GBC cable)                           */
-#if defined(CONFIG_GBC_CABLE_ON_GBA)
-#define PIO_SET_COUNT   5
-#define PIO_SD          16  /* bit 4 */
-#else
-#define PIO_SET_COUNT   4
+ *   bit 2 = SO  (GP2)       bit 3 = SD  (GP3)               */
 #define PIO_SD          8   /* bit 3 */
-#endif
 #define PIO_SC          1   /* bit 0 */
 #define PIO_SO          4   /* bit 2 */
 
@@ -96,6 +91,30 @@ RPI_PICO_PIO_DEFINE_PROGRAM(pio_slave_fw, 0, 18,
     0xbf42, // 18: nop                           [31]
             //     .wrap
 );
+
+/* Detect cable type by reading GP1 (SI pin).
+ * GBA cable: GP1 hardwired to GND in cable, reads LOW
+ * GBC cable: GP1 connected to GBA SO, reads HIGH (pull-up) */
+static bool detect_gbc_cable(void)
+{
+    /* RP2040 SIO GPIO_IN register - always reflects pin level
+     * regardless of function select (PIO, SPI, etc.) */
+    return !!(*((volatile uint32_t *)0xd0000004) & (1u << 1));
+}
+
+/* Patch PIO instructions in-place: move SD from GP3 (bit 3) to GP4 (bit 4).
+ * Only patches SET PINS and SET PINDIRS instructions. */
+static void patch_pio_sd_to_gp4(PIO pio, uint32_t offset, uint32_t len)
+{
+    for (uint32_t i = 0; i < len; i++) {
+        uint32_t instr = pio->instr_mem[offset + i];
+        if ((instr & 0xe000) != 0xe000) continue;     /* not a SET */
+        uint32_t dest = (instr >> 5) & 0x7;
+        if (dest != 0 && dest != 4) continue;          /* not PINS/PINDIRS */
+        if (instr & (1 << 3))                          /* SD bit set? */
+            pio->instr_mem[offset + i] = (instr & ~(1u << 3)) | (1u << 4);
+    }
+}
 
 static PIO g_pio = NULL;
 static size_t g_sm = 0;
@@ -187,7 +206,11 @@ static void link_configureMaster()
     pio_sm_restart(g_pio, g_sm);
     pio_sm_clear_fifos(g_pio, g_sm);
 
+    bool gbc = detect_gbc_cable();
+
 	uint32_t offset = pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_master_fw));
+    if (gbc) patch_pio_sd_to_gp4(g_pio, offset, 27);
+
 	pio_sm_config sm_config = pio_get_default_sm_config();
 
     #pragma push_macro("pio0")
@@ -195,14 +218,11 @@ static void link_configureMaster()
     uint32_t SC_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 0);
     uint32_t SI_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 1);
     uint32_t SO_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 2);
-    uint32_t SD_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 3);
     #pragma pop_macro("pio0")
-#if defined(CONFIG_GBC_CABLE_ON_GBA)
-    SD_pin = 4;  // Generic GBC cable routes SD to GP4 instead of GP3
-#endif
+    uint32_t SD_pin = gbc ? 4 : 3;
 
     sm_config_set_out_pins(&sm_config, SD_pin, 1);
-    sm_config_set_set_pins(&sm_config, SC_pin, PIO_SET_COUNT);
+    sm_config_set_set_pins(&sm_config, SC_pin, gbc ? 5 : 4);
     sm_config_set_in_pins(&sm_config, SD_pin);
     sm_config_set_jmp_pin(&sm_config, SD_pin);
 
@@ -234,7 +254,11 @@ static void link_configureSlave()
     pio_sm_restart(g_pio, g_sm);
     pio_sm_clear_fifos(g_pio, g_sm);
 
+    bool gbc = detect_gbc_cable();
+
 	uint32_t offset = pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_slave_fw));
+    if (gbc) patch_pio_sd_to_gp4(g_pio, offset, 19);
+
 	pio_sm_config sm_config = pio_get_default_sm_config();
 
     #pragma push_macro("pio0")
@@ -242,14 +266,11 @@ static void link_configureSlave()
     uint32_t SC_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 0);
     uint32_t SI_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 1);
     uint32_t SO_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 2);
-    uint32_t SD_pin = DT_RPI_PICO_PIO_PIN_BY_NAME(DT_CHILD(DT_NODELABEL(pio0), piolink), default, 0, link_pins, 3);
     #pragma pop_macro("pio0")
-#if defined(CONFIG_GBC_CABLE_ON_GBA)
-    SD_pin = 4;  // Generic GBC cable routes SD to GP4 instead of GP3
-#endif
+    uint32_t SD_pin = gbc ? 4 : 3;
 
     sm_config_set_out_pins(&sm_config, SD_pin, 1);
-    sm_config_set_set_pins(&sm_config, SC_pin, PIO_SET_COUNT);
+    sm_config_set_set_pins(&sm_config, SC_pin, gbc ? 5 : 4);
     sm_config_set_in_pins(&sm_config, SD_pin);
 
     sm_config_set_out_shift(&sm_config, true, false, 0);

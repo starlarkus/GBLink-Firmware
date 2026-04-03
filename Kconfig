@@ -43,12 +43,4 @@ menu "Application Options"
         OEM cables or original GB/GBC hardware — those devices either ignore
         the SD pin or treat SD LOW as a valid "external master" signal.
 
-    config GBC_CABLE_ON_GBA
-    bool "Use generic GBC cable for GBA mode (SD on GP4)"
-    default n
-    help
-        Enable when using a generic GBC link cable to connect to a GBA.
-        Generic GBC cables wire all 6 pins through; on this PCB that routes
-        the SD signal to GP4 rather than the standard GP3. Without this
-        option SD is read from GP3 (correct for OEM GBA cables).
 endmenu
