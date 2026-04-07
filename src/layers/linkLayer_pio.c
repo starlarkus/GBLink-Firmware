@@ -1,6 +1,7 @@
 #include "linkLayer.h"
 
 #include "hardware/pio.h"
+#include "hardware/gpio.h"
 
 #include <zephyr/drivers//misc/pio_rpi_pico/pio_rpi_pico.h>
 #include <zephyr/drivers/pinctrl.h>
@@ -27,93 +28,74 @@ static enum LinkMode g_mode = SLAVE;
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-/* SET-instruction pin values.  PIO programs are compiled with SD on GP3
- * (GBA cable default).  When a GBC cable is detected at runtime, the
- * instructions are patched in PIO memory to move SD to GP4 (bit 4).
+/* SET-instruction pin values.
  *   bit 0 = SC  (GP0)       bit 1 = SI  (GP1, always input)
- *   bit 2 = SO  (GP2)       bit 3 = SD  (GP3)               */
-#define PIO_SD          8   /* bit 3 */
+ *   bit 2 = SO  (GP2)       bit 3/4 = SD (GP3 or GP4)       */
 #define PIO_SC          1   /* bit 0 */
 #define PIO_SO          4   /* bit 2 */
+#define PIO_SD_GBA      8   /* bit 3 — GBA cable, SD on GP3, set_count=4 */
+#define PIO_SD_GBC      16  /* bit 4 — GBC cable, SD on GP4, set_count=5 */
 
-RPI_PICO_PIO_DEFINE_PROGRAM(pio_master_fw, 0, 26,
-                            //     .wrap_target
-    (0xe080 | PIO_SC | PIO_SO | PIO_SD), //  0: set    pindirs, SC|SO|SD=out
-    (0xe000 | PIO_SC | PIO_SO | PIO_SD), //  1: set    pins, SC|SO|SD=HIGH
-    0x0082, //  2: jmp    y--, 2
-    0xc001, //  3: irq    nowait 1
-    0xe03e, //  4: set    x, 30
-    0x0245, //  5: jmp    x--, 5                 [2]
-    0x80a0, //  6: pull   block
-    0xa047, //  7: mov    y, osr
-    0xe02f, //  8: set    x, 15
-    0x80a0, //  9: pull   block
-    (0xe000 | PIO_SO | PIO_SD),          // 10: set    pins, SO|SD=HIGH
-    0xef04, // 11: set    pins, SO=HIGH          [15]
-    0x6e01, // 12: out    pins, 1                [14]
-    0x004c, // 13: jmp    x--, 12
-    (0xef00 | PIO_SO | PIO_SD),          // 14: set    pins, SO|SD=HIGH   [15]
-    (0xe000 | PIO_SD),                   // 15: set    pins, SD=HIGH
-    0xe085, // 16: set    pindirs, SC|SO=out
-    0xe03f, // 17: set    x, 31
-    0x0053, // 18: jmp    x--, 19
-    0x0035, // 19: jmp    !x, 21
-    0x00d2, // 20: jmp    pin, 18
-    0xf62f, // 21: set    x, 15                  [22]
-    0x4e01, // 22: in     pins, 1                [14]
-    0x0056, // 23: jmp    x--, 22
-    0x9020, // 24: push   block                  [16]
-    (0xfe00 | PIO_SO | PIO_SD),          // 25: set    pins, SO|SD=HIGH   [30]
-    0xc000, // 26: irq    nowait 0
-            //     .wrap
-);
+/* --- GBA cable programs (SD on GP3) --- */
 
-RPI_PICO_PIO_DEFINE_PROGRAM(pio_slave_fw, 0, 18,
-                //     .wrap_target
-    (0xe000 | PIO_SD),                   //  0: set    pins, SD=HIGH
-    0xe084, //  1: set    pindirs, SO=out
-    0xe02f, //  2: set    x, 15
-    0x2020, //  3: wait   0 pin, 0
-    0xd701, //  4: irq    nowait 1               [23]
-    0x4e01, //  5: in     pins, 1                [14]
-    0x0045, //  6: jmp    x--, 5
-    0x8020, //  7: push   block
-    (0xe000 | PIO_SD),                   //  8: set    pins, SD=HIGH
-    (0xe080 | PIO_SO | PIO_SD),          //  9: set    pindirs, SO|SD=out
-    0xbf42, // 10: nop                           [31]
-    0xe02f, // 11: set    x, 15
-    0x80a0, // 12: pull   block
-    0xf000, // 13: set    pins, 0                [16]
-    0x6e01, // 14: out    pins, 1                [14]
-    0x004e, // 15: jmp    x--, 14
-    (0xf000 | PIO_SD),                   // 16: set    pins, SD=HIGH      [16]
-    0xc000, // 17: irq    nowait 0
-    0xbf42, // 18: nop                           [31]
-            //     .wrap
-);
+RPI_PICO_PIO_DEFINE_PROGRAM(pio_master_gba, 0, 26,
+    (0xe080 | PIO_SC | PIO_SO | PIO_SD_GBA), //  0: set    pindirs, SC|SO|SD=out
+    (0xe000 | PIO_SC | PIO_SO | PIO_SD_GBA), //  1: set    pins, SC|SO|SD=HIGH
+    0x0082, 0xc001, 0xe03e, 0x0245, 0x80a0, 0xa047, 0xe02f, 0x80a0,
+    (0xe000 | PIO_SO | PIO_SD_GBA),          // 10: set    pins, SO|SD=HIGH
+    0xef04, 0x6e01, 0x004c,
+    (0xef00 | PIO_SO | PIO_SD_GBA),          // 14: set    pins, SO|SD=HIGH   [15]
+    (0xe000 | PIO_SD_GBA),                   // 15: set    pins, SD=HIGH
+    0xe085, 0xe03f, 0x0053, 0x0035, 0x00d2,
+    0xf62f, 0x4e01, 0x0056, 0x9020,
+    (0xfe00 | PIO_SO | PIO_SD_GBA),          // 25: set    pins, SO|SD=HIGH   [30]
+    0xc000);
+
+RPI_PICO_PIO_DEFINE_PROGRAM(pio_slave_gba, 0, 18,
+    (0xe000 | PIO_SD_GBA), 0xe084, 0xe02f, 0x2020,
+    0xd701, 0x4e01, 0x0045, 0x8020,
+    (0xe000 | PIO_SD_GBA),
+    (0xe080 | PIO_SO | PIO_SD_GBA),
+    0xbf42, 0xe02f, 0x80a0, 0xf000, 0x6e01, 0x004e,
+    (0xf000 | PIO_SD_GBA),
+    0xc000, 0xbf42);
+
+/* --- GBC cable programs (SD on GP4) --- */
+
+RPI_PICO_PIO_DEFINE_PROGRAM(pio_master_gbc, 0, 26,
+    (0xe080 | PIO_SC | PIO_SO | PIO_SD_GBC), //  0: set    pindirs, SC|SO|SD=out
+    (0xe000 | PIO_SC | PIO_SO | PIO_SD_GBC), //  1: set    pins, SC|SO|SD=HIGH
+    0x0082, 0xc001, 0xe03e, 0x0245, 0x80a0, 0xa047, 0xe02f, 0x80a0,
+    (0xe000 | PIO_SO | PIO_SD_GBC),          // 10: set    pins, SO|SD=HIGH
+    0xef04, 0x6e01, 0x004c,
+    (0xef00 | PIO_SO | PIO_SD_GBC),          // 14: set    pins, SO|SD=HIGH   [15]
+    (0xe000 | PIO_SD_GBC),                   // 15: set    pins, SD=HIGH
+    0xe085, 0xe03f, 0x0053, 0x0035, 0x00d2,
+    0xf62f, 0x4e01, 0x0056, 0x9020,
+    (0xfe00 | PIO_SO | PIO_SD_GBC),          // 25: set    pins, SO|SD=HIGH   [30]
+    0xc000);
+
+RPI_PICO_PIO_DEFINE_PROGRAM(pio_slave_gbc, 0, 18,
+    (0xe000 | PIO_SD_GBC), 0xe084, 0xe02f, 0x2020,
+    0xd701, 0x4e01, 0x0045, 0x8020,
+    (0xe000 | PIO_SD_GBC),
+    (0xe080 | PIO_SO | PIO_SD_GBC),
+    0xbf42, 0xe02f, 0x80a0, 0xf000, 0x6e01, 0x004e,
+    (0xf000 | PIO_SD_GBC),
+    0xc000, 0xbf42);
 
 /* Detect cable type by reading GP1 (SI pin).
- * GBA cable: GP1 hardwired to GND in cable, reads LOW
- * GBC cable: GP1 connected to GBA SO, reads HIGH (pull-up) */
+ * GBA cable: GP1 hardwired to GND in cable — reads LOW
+ * GBC cable: GP1 connected to GBA SO or floating — pull-up → reads HIGH */
 static bool detect_gbc_cable(void)
 {
-    /* RP2040 SIO GPIO_IN register - always reflects pin level
-     * regardless of function select (PIO, SPI, etc.) */
-    return !!(*((volatile uint32_t *)0xd0000004) & (1u << 1));
-}
-
-/* Patch PIO instructions in-place: move SD from GP3 (bit 3) to GP4 (bit 4).
- * Only patches SET PINS and SET PINDIRS instructions. */
-static void patch_pio_sd_to_gp4(PIO pio, uint32_t offset, uint32_t len)
-{
-    for (uint32_t i = 0; i < len; i++) {
-        uint32_t instr = pio->instr_mem[offset + i];
-        if ((instr & 0xe000) != 0xe000) continue;     /* not a SET */
-        uint32_t dest = (instr >> 5) & 0x7;
-        if (dest != 0 && dest != 4) continue;          /* not PINS/PINDIRS */
-        if (instr & (1 << 3))                          /* SD bit set? */
-            pio->instr_mem[offset + i] = (instr & ~(1u << 3)) | (1u << 4);
-    }
+    gpio_set_function(1, GPIO_FUNC_SIO);
+    gpio_set_dir(1, GPIO_IN);
+    gpio_pull_up(1);
+    for (volatile int i = 0; i < 1000; i++);  /* settle ~10us */
+    bool gbc = gpio_get(1);
+    gpio_set_function(1, GPIO_FUNC_PIO0);
+    return gbc;
 }
 
 static PIO g_pio = NULL;
@@ -208,8 +190,9 @@ static void link_configureMaster()
 
     bool gbc = detect_gbc_cable();
 
-	uint32_t offset = pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_master_fw));
-    if (gbc) patch_pio_sd_to_gp4(g_pio, offset, 27);
+	uint32_t offset = gbc
+        ? pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_master_gbc))
+        : pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_master_gba));
 
 	pio_sm_config sm_config = pio_get_default_sm_config();
 
@@ -237,8 +220,8 @@ static void link_configureMaster()
 	sm_config_set_clkdiv(&sm_config, 67.816f); // ~540 ns per inst, 16 inst equal baud 115200
 
 	sm_config_set_wrap(&sm_config,
-			   offset + RPI_PICO_PIO_GET_WRAP_TARGET(pio_master_fw),
-			   offset + RPI_PICO_PIO_GET_WRAP(pio_master_fw));
+			   offset + (gbc ? RPI_PICO_PIO_GET_WRAP_TARGET(pio_master_gbc) : RPI_PICO_PIO_GET_WRAP_TARGET(pio_master_gba)),
+			   offset + (gbc ? RPI_PICO_PIO_GET_WRAP(pio_master_gbc) : RPI_PICO_PIO_GET_WRAP(pio_master_gba)));
     
 	pio_sm_init(g_pio, g_sm, -1, &sm_config);
 	pio_sm_set_enabled(g_pio, g_sm, true);
@@ -256,8 +239,9 @@ static void link_configureSlave()
 
     bool gbc = detect_gbc_cable();
 
-	uint32_t offset = pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_slave_fw));
-    if (gbc) patch_pio_sd_to_gp4(g_pio, offset, 19);
+	uint32_t offset = gbc
+        ? pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_slave_gbc))
+        : pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_slave_gba));
 
 	pio_sm_config sm_config = pio_get_default_sm_config();
 
@@ -284,8 +268,8 @@ static void link_configureSlave()
 	sm_config_set_clkdiv(&sm_config, 67.816f); // ~540 ns per inst, 16 inst equal baud 115200
 
 	sm_config_set_wrap(&sm_config,
-			   offset + RPI_PICO_PIO_GET_WRAP_TARGET(pio_slave_fw),
-			   offset + RPI_PICO_PIO_GET_WRAP(pio_slave_fw));
+			   offset + (gbc ? RPI_PICO_PIO_GET_WRAP_TARGET(pio_slave_gbc) : RPI_PICO_PIO_GET_WRAP_TARGET(pio_slave_gba)),
+			   offset + (gbc ? RPI_PICO_PIO_GET_WRAP(pio_slave_gbc) : RPI_PICO_PIO_GET_WRAP(pio_slave_gba)));
     
 	pio_sm_init(g_pio, g_sm, -1, &sm_config);
 	pio_sm_set_enabled(g_pio, g_sm, true);
