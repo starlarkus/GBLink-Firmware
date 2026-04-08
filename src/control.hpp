@@ -54,6 +54,7 @@ public:
             case Mode::gbaTradeEmu:
             {
                 Hardware::getInstance().setLED(5, 5, 0, true); // Yellow = GBA mode
+                link_detectCableType();
 
                 party::partyInit();
                 UsbLayer::getInstance().setReceiveDataHandler(party::usbReceivePkmFile, nullptr);
@@ -69,6 +70,7 @@ public:
             case Mode::gbaLink:
             {
                 Hardware::getInstance().setLED(5, 5, 0, true); // Yellow = GBA mode
+                link_detectCableType();
 
                 UsbLayer::getInstance().setReceiveDataHandler(usbLink_receiveHandler, nullptr);
 
@@ -103,6 +105,7 @@ public:
             case Mode::gbaPassthrough:
             {
                 Hardware::getInstance().setLED(0, 5, 5, true); // Cyan = GBA passthrough mode
+                link_detectCableType();
 
                 UsbLayer::getInstance().setReceiveDataHandler(rawRelay_receiveHandler, nullptr);
 

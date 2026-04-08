@@ -21,6 +21,7 @@ This is forked from Celio Firmware from the CelioLink project and adds the funct
 | **GBA Link** | `0x01` | Bridge two GBA systems over the internet |
 | **GB Link** | `0x02` | SPI passthrough for Game Boy |
 | **GB Printer** | `0x31` | Game Boy Printer emulation (bit-bang SPI slave) |
+| **GBA Passthrough** | `0x04` | Direct GBA link relay |
 
 ---
 
@@ -37,7 +38,7 @@ The firmware uses the RP2040 PIO to communicate with the Game Boy. Connect the L
 | **SCK** (Clock) | **GP0** |
 | **SIN** (Data In) | **GP1** |
 | **SOUT** (Data Out) | **GP2** |
-| **SD** (Chip Select) | **GP3** |
+| **SD** (Chip Select) | **GP3** (GBA cable) / **GP4** (GBC cable) |
 | **GND** | **Ground** |
 
 Additional hardware pins:
@@ -66,14 +67,23 @@ LED color can also be set via USB command (`0x42`).
 
 ---
 
-## Link Cable Requirements
+## Link Cable Compatibility
 
-**GBA link cable connectors are not identical: Cheap 3rd party GBA cables missing the hub typicall only have 4 conductors are are missing a groud which result in a poor connection**
+The firmware automatically detects which cable type is connected at mode selection time.
+
+| Cable Type | Supported Modes | Notes |
+|:---|:---|:---|
+| **OEM GBA Link Cable** | GBA modes only | SD on GP3. |
+| **Generic GBC Link Cable** | All GBA and GB modes | All 6 pins wired through. SD routes to GP4 in GBA mode. Auto-detected. |
+
+**GBA link cable connectors are not identical: Cheap 3rd party GBA cables missing the hub typically only have 4 conductors and are missing a ground which results in a poor connection.**
 
 - **Slim** connector = **Master**
 - **Wide** connector = **Slave**
 
 The device **must** be connected to the **master connector** for GBA modes.
+
+> **Tip:** Connect the cable to the adapter before selecting a GBA mode in the web app. The firmware detects the cable type at mode selection time.
 
 ---
 

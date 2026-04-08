@@ -30,3 +30,5 @@ void link_startTransive();
 enum LinkMode link_getMode();
 
 void link_changeMode(enum LinkMode mode);
+
+void link_detectCableType(void);

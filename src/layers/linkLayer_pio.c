@@ -86,7 +86,10 @@ RPI_PICO_PIO_DEFINE_PROGRAM(pio_slave_gbc, 0, 18,
 
 /* Detect cable type by reading GP1 (SI pin).
  * GBA cable: GP1 hardwired to GND in cable — reads LOW
- * GBC cable: GP1 connected to GBA SO or floating — pull-up → reads HIGH */
+ * GBC cable: GP1 connected to GBA SO or floating — pull-up → reads HIGH
+ *
+ * Called once via link_detectCableType() when a GBA mode is selected
+ * (before the GBA enters link mode and starts driving SO). */
 static bool detect_gbc_cable(void)
 {
     gpio_set_function(1, GPIO_FUNC_SIO);
@@ -96,6 +99,13 @@ static bool detect_gbc_cable(void)
     bool gbc = gpio_get(1);
     gpio_set_function(1, GPIO_FUNC_PIO0);
     return gbc;
+}
+
+static bool g_gbc_cable = false;
+
+void link_detectCableType(void)
+{
+    g_gbc_cable = detect_gbc_cable();
 }
 
 static PIO g_pio = NULL;
@@ -188,7 +198,7 @@ static void link_configureMaster()
     pio_sm_restart(g_pio, g_sm);
     pio_sm_clear_fifos(g_pio, g_sm);
 
-    bool gbc = detect_gbc_cable();
+    bool gbc = g_gbc_cable;
 
 	uint32_t offset = gbc
         ? pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_master_gbc))
@@ -213,6 +223,7 @@ static void link_configureMaster()
     sm_config_set_in_shift(&sm_config, false, false, 0);
 
     pio_gpio_init(g_pio, SD_pin);
+    if (gbc) gpio_pull_up(SD_pin);
     pio_gpio_init(g_pio, SC_pin);
     pio_gpio_init(g_pio, SO_pin);
     pio_gpio_init(g_pio, SI_pin);
@@ -237,7 +248,7 @@ static void link_configureSlave()
     pio_sm_restart(g_pio, g_sm);
     pio_sm_clear_fifos(g_pio, g_sm);
 
-    bool gbc = detect_gbc_cable();
+    bool gbc = g_gbc_cable;
 
 	uint32_t offset = gbc
         ? pio_add_program(g_pio, RPI_PICO_PIO_GET_PROGRAM(pio_slave_gbc))
@@ -261,6 +272,7 @@ static void link_configureSlave()
     sm_config_set_in_shift(&sm_config, false, false, 0);
 
     pio_gpio_init(g_pio, SD_pin);
+    if (gbc) gpio_pull_up(SD_pin);
     pio_gpio_init(g_pio, SC_pin);
     pio_gpio_init(g_pio, SO_pin);
     pio_gpio_init(g_pio, SI_pin);
