@@ -46,7 +46,7 @@ RPI_PICO_PIO_DEFINE_PROGRAM(pio_master_gba, 0, 26,
     0xef04, 0x6e01, 0x004c,
     (0xef00 | PIO_SO | PIO_SD_GBA),          // 14: set    pins, SO|SD=HIGH   [15]
     (0xe000 | PIO_SD_GBA),                   // 15: set    pins, SD=HIGH
-    0xe085, 0xe03f, 0x0053, 0x0035, 0x00d2,
+    0xe085, 0xe03f, 0x1f53, 0x0035, 0x00d2,
     0xf62f, 0x4e01, 0x0056, 0x9020,
     (0xfe00 | PIO_SO | PIO_SD_GBA),          // 25: set    pins, SO|SD=HIGH   [30]
     0xc000);
@@ -70,7 +70,7 @@ RPI_PICO_PIO_DEFINE_PROGRAM(pio_master_gbc, 0, 26,
     0xef04, 0x6e01, 0x004c,
     (0xef00 | PIO_SO | PIO_SD_GBC),          // 14: set    pins, SO|SD=HIGH   [15]
     (0xe000 | PIO_SD_GBC),                   // 15: set    pins, SD=HIGH
-    0xe085, 0xe03f, 0x0053, 0x0035, 0x00d2,
+    0xe085, 0xe03f, 0x1f53, 0x0035, 0x00d2,
     0xf62f, 0x4e01, 0x0056, 0x9020,
     (0xfe00 | PIO_SO | PIO_SD_GBC),          // 25: set    pins, SO|SD=HIGH   [30]
     0xc000);

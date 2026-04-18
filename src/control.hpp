@@ -3,7 +3,7 @@
 #include "module/link.hpp"
 #include "module/emu.hpp"
 #include "module/gb.hpp"
-#include "module/rawRelay.hpp"
+#include "module/advanceWars.hpp"
 #include "linkStatus.hpp"
 #include "callbacks/commands.hpp"
 #include "payloads/pokemon.hpp"
@@ -31,7 +31,7 @@ class Control
         gbaLink = 0x01,
         gbLink = 0x02,
         gbPrinter = 0x03,
-        gbaPassthrough = 0x04
+        advanceWars = 0x04
     };
 
     static constexpr uint8_t callSetModeId = 0x01;
@@ -102,16 +102,16 @@ public:
                 break;
             }
 
-            case Mode::gbaPassthrough:
+            case Mode::advanceWars:
             {
-                Hardware::getInstance().setLED(0, 5, 5, true); // Cyan = GBA passthrough mode
+                Hardware::getInstance().setLED(0, 5, 5, true); // Cyan = Advance Wars mode
                 link_detectCableType();
 
-                UsbLayer::getInstance().setReceiveDataHandler(rawRelay_receiveHandler, nullptr);
+                UsbLayer::getInstance().setReceiveDataHandler(awRelay_receiveHandler, nullptr);
 
-                RawRelayModule rawRelayModule;
-                m_currentModule = &rawRelayModule;
-                rawRelayModule.execute();
+                AdvanceWarsModule advanceWarsModule;
+                m_currentModule = &advanceWarsModule;
+                advanceWarsModule.execute();
 
                 sendLinkStatus(LinkStatus::LinkClosed);
                 break;
