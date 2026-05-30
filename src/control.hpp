@@ -11,6 +11,7 @@
 #include "payloads/pokemon.hpp"
 #include "module/moduleInterface.hpp"
 #include "hardware.hpp"
+#include "persist.hpp"
 
 class Control
 {
@@ -22,10 +23,10 @@ class Control
         GetFirmwareInfo = 0x0F
     };
 
-    // Firmware version: 2.1.1
+    // Firmware version: 2.1.2
     static constexpr uint8_t FW_VERSION_MAJOR = 2;
     static constexpr uint8_t FW_VERSION_MINOR = 1;
-    static constexpr uint8_t FW_VERSION_PATCH = 1;
+    static constexpr uint8_t FW_VERSION_PATCH = 2;
 
     enum class Mode
     {
@@ -49,13 +50,17 @@ public:
     void executeMode()
     {
         k_sem_take(&m_waitForModeSemaphore, K_FOREVER);
+        // Capture the requested mode; callSetMode always sets m_mode before
+        // giving the semaphore (including when preempting a running mode), so we
+        // must not clobber it below.
+        const Mode mode = m_mode;
         sendLinkStatus(LinkStatus::DeviceReady);
 
-        switch (m_mode)
+        switch (mode)
         {
             case Mode::gbaTradeEmu:
             {
-                Hardware::getInstance().setLED(5, 5, 0, true); // Yellow = GBA mode
+                applyLedForSlot(LED_SLOT_GBA);
                 link_detectCableType();
 
                 party::partyInit();
@@ -71,7 +76,7 @@ public:
 
             case Mode::gbaLink:
             {
-                Hardware::getInstance().setLED(5, 5, 0, true); // Yellow = GBA mode
+                applyLedForSlot(LED_SLOT_GBA);
                 link_detectCableType();
 
                 Transport::registerDataHandler(usbLink_receiveHandler, nullptr);
@@ -106,7 +111,7 @@ public:
 
             case Mode::advanceWars:
             {
-                Hardware::getInstance().setLED(0, 5, 5, true); // Cyan = Advance Wars mode
+                applyLedForSlot(LED_SLOT_ADVANCE_WARS);
                 link_detectCableType();
 
                 Transport::registerDataHandler(awRelay_receiveHandler, nullptr);
@@ -120,9 +125,8 @@ public:
             }
         }
 
-        m_mode = {};
         m_currentModule = nullptr;
-        Hardware::getInstance().setLED(0, 5, 0, true); // Green = connected, no active mode
+        applyLedForSlot(LED_SLOT_IDLE); // green = connected, no active mode
     }
 
 private:
@@ -141,6 +145,12 @@ private:
         SetVoltage3V3 = 0x40,
         SetVoltage5V = 0x41,
         SetLEDColor = 0x42,
+        RebootBootloader = 0x43,
+        SetWebUsbLanding = 0x44,
+        GetLedConfig = 0x45,
+        SetModeLedColor = 0x46,
+        ResetLedColors = 0x47,
+        Reboot = 0x48,
     };
 
     void receiveCommand(std::span<const uint8_t> data)
@@ -184,8 +194,46 @@ private:
                     Hardware::getInstance().setLED(data[1], data[2], data[3], data[4] != 0);
                 }
                 break;
+            case HardwareCommand::RebootBootloader:
+                // Resets into the USB bootloader; does not return.
+                Hardware::getInstance().rebootToBootloader();
+                break;
+            case HardwareCommand::SetWebUsbLanding:
+                // Persist the WebUSB landing-page toggle; applies on next reconnect.
+                if (data.size() >= 2) {
+                    setLandingPageEnabled(data[1] != 0);
+                }
+                break;
+            case HardwareCommand::GetLedConfig:
+                return callGetLedConfig();
+            case HardwareCommand::SetModeLedColor:
+                // [0x46, slot, r, g, b] — persist a mode's LED colour.
+                if (data.size() >= 5) {
+                    setLedColor(data[1], data[2], data[3], data[4]);
+                }
+                break;
+            case HardwareCommand::ResetLedColors:
+                // Restore all per-mode LED colours to the built-in defaults.
+                resetLedColors();
+                break;
+            case HardwareCommand::Reboot:
+                // Warm-reboot into the app so persisted settings apply now; no return.
+                Hardware::getInstance().reboot();
+                break;
             default: break;
         }
+    }
+
+    void callGetLedConfig()
+    {
+        // [0x45, count, r0,g0,b0, ... r4,g4,b4]
+        uint8_t info[2 + LED_SLOT_COUNT * 3];
+        info[0] = static_cast<uint8_t>(HardwareCommand::GetLedConfig);
+        info[1] = LED_SLOT_COUNT;
+        for (uint8_t slot = 0; slot < LED_SLOT_COUNT; slot++) {
+            getLedColor(slot, &info[2 + slot * 3]);
+        }
+        Transport::sendData(std::span<const uint8_t>(info, sizeof(info)));
     }
 
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
@@ -195,6 +243,13 @@ private:
     void callSetMode(Mode mode)
     {
         m_mode = mode;
+        // If a mode is already running, cancel it so executeMode unblocks and
+        // switches to the new mode (otherwise SetMode would queue behind a mode
+        // that never exits). Same cancel path the web "cancel" command uses.
+        if (m_currentModule != nullptr)
+        {
+            m_currentModule->cancel();
+        }
         k_sem_give(&m_waitForModeSemaphore);
     }
 
@@ -209,7 +264,10 @@ private:
             0x0F, // Echo back the command ID so web app knows this is a firmware info response
             FW_VERSION_MAJOR,
             FW_VERSION_MINOR,
-            FW_VERSION_PATCH
+            FW_VERSION_PATCH,
+            // Byte 4: WebUSB landing-page enabled (1) / disabled (0). Older web
+            // apps simply ignore the extra byte.
+            static_cast<uint8_t>(landingPageEnabled() ? 1 : 0)
         };
         Transport::sendData(std::span<const uint8_t>(info, sizeof(info)));
     }

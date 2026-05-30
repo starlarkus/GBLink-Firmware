@@ -1,6 +1,7 @@
 #include "gb.hpp"
 #include "../linkStatus.hpp"
 #include "../hardware.hpp"
+#include "../persist.hpp"
 #include "../layers/usbLayer.hpp"
 #include "../layers/transport.hpp"
 extern "C"
@@ -104,8 +105,7 @@ void GBModule::execute()
     // Initialize GB 8-bit SPI PIO on pio0
     gb_link_init();
 
-    // Blue = GB/GBC mode
-    Hardware::getInstance().setLED(0, 0, 5, true);
+    applyLedForSlot(LED_SLOT_GBC); // GB/GBC mode
 
     Transport::registerDataHandler(usbDataHandler, this);
 
@@ -121,7 +121,7 @@ void GBModule::execute()
 
             case SubMode::printer:
                 sendLinkStatus(LinkStatus::GBPrinterModeActive);
-                Hardware::getInstance().setLED(5, 0, 5, true); // Purple = printer sub-mode
+                applyLedForSlot(LED_SLOT_PRINTER); // printer sub-mode
                 
                 // Disable PIO SPI for GPIO bit-bang printer mode
                 gb_link_deinit();
@@ -131,7 +131,7 @@ void GBModule::execute()
                 // Re-enable PIO SPI
                 gb_link_init();
                 
-                Hardware::getInstance().setLED(0, 0, 5, true); // Back to blue (GB mode)
+                applyLedForSlot(LED_SLOT_GBC); // back to GB mode
                 m_subMode = SubMode::normal;
                 sendLinkStatus(LinkStatus::GBModeActive);
                 break;
@@ -159,15 +159,13 @@ void GBModule::executePrinterMode()
 
     // No gb_link_init() — printer mode uses GPIO bit-bang, not PIO SPI
 
-    // Purple = printer mode
-    Hardware::getInstance().setLED(5, 0, 5, true);
+    applyLedForSlot(LED_SLOT_PRINTER); // printer mode
 
     sendLinkStatus(LinkStatus::GBPrinterModeActive);
 
     printerModeLoop();
 
-    // Back to green (connected, no active mode)
-    Hardware::getInstance().setLED(0, 5, 0, true);
+    applyLedForSlot(LED_SLOT_IDLE); // connected, no active mode
 }
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//

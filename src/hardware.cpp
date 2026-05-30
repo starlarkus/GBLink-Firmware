@@ -1,6 +1,7 @@
 #include "hardware.hpp"
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/reboot.h>
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
@@ -134,6 +135,33 @@ void Hardware::setLED(uint8_t r, uint8_t g, uint8_t b, bool on)
     } else {
         ws2812Set(0x000000);
     }
+}
+
+// Reset into the RP2040 USB bootloader (BOOTSEL/PICOBOOT) so the host can
+// reflash over WebUSB. The Zephyr hal_rpi_pico module does not ship
+// pico/bootrom.h, so look up reset_usb_boot() in the bootrom directly:
+// the func-table pointer lives at 0x14 and the table-lookup routine at 0x18.
+void Hardware::rebootToBootloader()
+{
+    typedef void *(*rom_table_lookup_fn)(uint16_t *table, uint32_t code);
+    typedef void (*reset_usb_boot_fn)(uint32_t gpio_mask, uint32_t disable_mask);
+
+    uint16_t *func_table = (uint16_t *)(uintptr_t)(*(uint16_t *)0x14);
+    rom_table_lookup_fn rom_table_lookup =
+        (rom_table_lookup_fn)(uintptr_t)(*(uint16_t *)0x18);
+
+    const uint32_t reset_usb_boot_code = (uint32_t)('U' | ('B' << 8));
+    reset_usb_boot_fn reset_usb_boot =
+        (reset_usb_boot_fn)rom_table_lookup(func_table, reset_usb_boot_code);
+
+    reset_usb_boot(0, 0); // does not return
+}
+
+// Warm-reboot back into the application (not the bootloader). Used to "apply now"
+// after settings changes — persisted LED colours are re-read at boot.
+void Hardware::reboot()
+{
+    sys_reboot(SYS_REBOOT_COLD); // does not return
 }
 
 // --- Boot-time Initialization ---

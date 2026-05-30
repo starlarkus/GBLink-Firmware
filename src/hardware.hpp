@@ -14,6 +14,8 @@ public:
     void setVoltage3V3();
     void setVoltage5V();
     void setLED(uint8_t r, uint8_t g, uint8_t b, bool on);
+    void rebootToBootloader();
+    void reboot();
 
 private:
     Hardware();

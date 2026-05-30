@@ -29,6 +29,7 @@ target_sources(
     PRIVATE
     src/main.cpp
     src/hardware.cpp
+    src/persist.cpp
 )
 
 set_compiler_property(PROPERTY diagnostic -fdiagnostics-color=never)

@@ -1,4 +1,5 @@
 #include "usbLayer.hpp"
+#include "../persist.hpp"
 
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/usb/usb_device.h>
@@ -163,11 +164,13 @@ namespace
     /* Number of allowed origins */
     #define NUMBER_OF_ALLOWED_ORIGINS   1
 
-    /* URL Descriptor: https://wicg.github.io/webusb/#url-descriptor */
+    /* URL Descriptor: https://wicg.github.io/webusb/#url-descriptor
+     * Chrome only surfaces the landing-page notification for https URLs, so the
+     * scheme must be 1 (https). bLength = 3 (header) + strlen("launcher.gblink.io"). */
     static const uint8_t webusb_origin_url[] = {
-        /* Length, DescriptorType, Scheme */
-        0x11, 0x03, 0x00,
-        'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', ':', '8', '0', '0', '0'
+        /* Length, DescriptorType, Scheme (1 = https) */
+        0x15, 0x03, 0x01,
+        'l', 'a', 'u', 'n', 'c', 'h', 'e', 'r', '.', 'g', 'b', 'l', 'i', 'n', 'k', '.', 'i', 'o'
     };
 
     /* Predefined response to control commands related to MS OS 1.0 descriptors
@@ -391,6 +394,11 @@ namespace
 
     static int usb_init()
     {
+        // Advertise the WebUSB landing page only if the user hasn't turned it
+        // off. The host reads this at enumeration, so the toggle takes effect on
+        // the next reconnect.
+        bos_cap_webusb.cap.iLandingPage = landingPageEnabled() ? 0x01 : 0x00;
+
         usb_bos_register_cap((void *)&bos_cap_webusb);
 	    usb_bos_register_cap((void *)&bos_cap_msosv2);
 	    usb_bos_register_cap((void *)&bos_cap_lpm);

@@ -31,3 +31,22 @@
         };
     };
 };
+
+/*
+ * Carve a 4 KB storage partition (one flash erase sector) off the top of flash
+ * for persistent settings (URL toggle and LED customization). The application is
+ * less than 200 KB and lives at the bottom, so the tail is free. The UF2 only writes
+ * the app region, so this sector survives firmware updates.
+ */
+&code_partition {
+    reg = <0x100 (DT_SIZE_M(2) - 0x100 - DT_SIZE_K(4))>;
+};
+
+&flash0 {
+    partitions {
+        storage_partition: partition@1ff000 {
+            label = "storage";
+            reg = <0x001ff000 DT_SIZE_K(4)>;
+        };
+    };
+};
