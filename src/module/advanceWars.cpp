@@ -17,15 +17,26 @@ void AdvanceWarsModule::execute()
     k_sem_take(&m_waitForStart, K_FOREVER);
     if (m_cancel) return;
 
-    // Step 3: Create section, enable PIO in assigned mode, relay raw data.
-    // AW multiplayer uses IRQ-based SIO with 0x7FFF as idle.
-    // One adapter MASTER (GBA=child/P2), one SLAVE (GBA=parent/P1).
+    // Step 3: Run the protocol proxy in the assigned role.
+    // SLAVE = attached GBA is bus master (P1), MASTER = GBA is bus slave (P2).
     {
-        AwSection section;
+        AwProtocolSection section(m_variant, m_linkMode);
         m_currentSection = &section;
+        // A cancel between the check above and this assignment would miss the
+        // section; re-check now that cancel() can reach it.
+        if (m_cancel)
+        {
+            m_currentSection = nullptr;
+            return;
+        }
         link_changeMode(m_linkMode);
         sendLinkStatus(LinkStatus::LinkConnected);
         section.process();
+        // Stop the PIO before the section destructor deregisters the link
+        // callbacks — a master-mode PIO free-runs and its ISR must not fire
+        // mid-deregistration. Also stops the GBA from being fed the link
+        // layer's 0xDEAD placeholder after the session ends.
+        link_changeMode(DISABLED);
     }
     m_currentSection = nullptr;
 }
@@ -49,7 +60,7 @@ void AdvanceWarsModule::receiveCommand(std::span<const uint8_t> command)
             break;
 
         case LinkModeCommand::ConnectLink:
-            // Ignored in AW mode — connection loop handles this
+            // Ignored in AW mode — the protocol proxy handles link establishment
             break;
 
         default: break;

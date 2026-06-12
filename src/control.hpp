@@ -52,8 +52,9 @@ public:
         k_sem_take(&m_waitForModeSemaphore, K_FOREVER);
         // Capture the requested mode; callSetMode always sets m_mode before
         // giving the semaphore (including when preempting a running mode), so we
-        // must not clobber it below.
+        // must not clobber it below. The variant travels with the mode.
         const Mode mode = m_mode;
+        const uint8_t awVariant = m_awVariant;
         sendLinkStatus(LinkStatus::DeviceReady);
 
         switch (mode)
@@ -114,9 +115,11 @@ public:
                 applyLedForSlot(LED_SLOT_ADVANCE_WARS);
                 link_detectCableType();
 
-                Transport::registerDataHandler(awRelay_receiveHandler, nullptr);
+                Transport::registerDataHandler(awProto_receiveHandler, nullptr);
 
-                AdvanceWarsModule advanceWarsModule;
+                AdvanceWarsModule advanceWarsModule(
+                    awVariant == 2 ? awproto::GameVariant::aw2
+                                   : awproto::GameVariant::aw1);
                 m_currentModule = &advanceWarsModule;
                 advanceWarsModule.execute();
 
@@ -132,6 +135,7 @@ public:
 private:
     struct k_sem m_waitForModeSemaphore;
     Mode m_mode;
+    uint8_t m_awVariant = 0;
 
     IModule* m_currentModule = nullptr;
 
@@ -171,7 +175,13 @@ private:
         if (!canHandle(data[0])) return;
         switch (static_cast<ControlCommand>(data[0]))
         {
-            case ControlCommand::SetMode: return callSetMode(static_cast<Mode>(data[1]));
+            // Optional third byte selects a game variant within the mode
+            // (Advance Wars: 1 = AW1, 2 = AW2; defaults to AW1 for older
+            // clients that send only [command, mode]).
+            case ControlCommand::SetMode:
+                if (data.size() < 2) return;
+                return callSetMode(static_cast<Mode>(data[1]),
+                                   data.size() >= 3 ? data[2] : 0);
             case ControlCommand::Cancel: return callCancel();
             case ControlCommand::EnterGBPrinter: return callSetMode(Mode::gbPrinter);
             case ControlCommand::GetFirmwareInfo: return callGetFirmwareInfo();
@@ -240,9 +250,10 @@ private:
     // CALLS
     //-////////////////////////////////////////////////////////////////////////////////////////////////////////-//
 
-    void callSetMode(Mode mode)
+    void callSetMode(Mode mode, uint8_t variant = 0)
     {
         m_mode = mode;
+        m_awVariant = variant;
         // If a mode is already running, cancel it so executeMode unblocks and
         // switches to the new mode (otherwise SetMode would queue behind a mode
         // that never exits). Same cancel path the web "cancel" command uses.

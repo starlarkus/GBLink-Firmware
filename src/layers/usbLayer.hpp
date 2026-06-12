@@ -65,12 +65,24 @@ public:
     bool sendData(std::span<const uint8_t> data)
     {
         if (!m_endpointsEnabled) return false;
+
+        // Same race as sendStatus: back-to-back data sends (e.g. a >64-byte
+        // protocol frame split across transport chunks) would overwrite
+        // m_sendData while the previous async transfer is still reading it.
+        k_sem_take(&m_dataTransferDone, K_MSEC(100));
+
         std::ranges::copy(data, m_sendData.begin());
         // usb_transfer is async (queues a k_work item), but with bInterval=1 on
         // the data endpoint the host polls every 1 ms, so the work-queue delay
         // is absorbed within the next poll cycle and has no meaningful impact.
-        return usb_transfer(dataInEndpoint, m_sendData.data(), data.size_bytes(),
-            USB_TRANS_WRITE, m_usbWriteDataCallback, this) == 0;
+        int ret = usb_transfer(dataInEndpoint, m_sendData.data(), data.size_bytes(),
+            USB_TRANS_WRITE, m_usbWriteDataCallback, this);
+
+        if (ret != 0) {
+            k_sem_give(&m_dataTransferDone);
+            return false;
+        }
+        return true;
     }
 
     void setReceiveCommandHandler(const UsbReceiveHandler& handler, void* userData)
@@ -174,6 +186,7 @@ private:
     std::array<uint8_t, m_endpointSize> m_sendData = {};
     std::array<uint8_t, 2> m_sendStatusData = {};  // Separate buffer for status to avoid race
     struct k_sem m_statusTransferDone;
+    struct k_sem m_dataTransferDone;
 
     UsbLayer()
     {
@@ -181,6 +194,7 @@ private:
         perpareNextReceive(m_receiveDataCommandHandler);
         k_sem_init(&m_waitForFreeEndpoint, 1, 1);
         k_sem_init(&m_statusTransferDone, 1, 1);  // starts at 1 so first sendStatus can proceed
+        k_sem_init(&m_dataTransferDone, 1, 1);
         k_msgq_init(&m_statusMsgQueue, m_statusQueueBuffer.data(), 2, m_statusQueueBuffer.size() / 2);
     }
 
@@ -190,7 +204,11 @@ private:
         self->layer->receive(size, self);
     }
 
-    static void m_usbWriteDataCallback(uint8_t ep, int size, void* userData){ }
+    static void m_usbWriteDataCallback(uint8_t ep, int size, void* userData)
+    {
+        UsbLayer* self = static_cast<UsbLayer*>(userData);
+        k_sem_give(&self->m_dataTransferDone);
+    }
 
     static void m_usbWriteStatusCallback(uint8_t ep, int size, void* userData)
     {

@@ -1,7 +1,7 @@
 
 #include <zephyr/kernel.h>
 
-#include "../sections/awSection.hpp"
+#include "../sections/awProtocolSection.hpp"
 #include "moduleInterface.hpp"
 
 class AdvanceWarsModule : public IModule
@@ -16,7 +16,8 @@ private:
     };
 
 public:
-    AdvanceWarsModule()
+    AdvanceWarsModule(awproto::GameVariant variant)
+        : m_variant(variant)
     {
         k_sem_init(&m_waitForLinkModeCommand, 0, 1);
         k_sem_init(&m_waitForStart, 0, 1);
@@ -42,6 +43,7 @@ private:
     struct k_sem m_waitForLinkModeCommand;
     struct k_sem m_waitForStart;
 
-    AwSection* m_currentSection = nullptr;
+    AwProtocolSection* m_currentSection = nullptr;
     enum LinkMode m_linkMode = SLAVE;
+    awproto::GameVariant m_variant;
 };
