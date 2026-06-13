@@ -1,11 +1,10 @@
-# Celio-Firmware
+# GBLink Firmware — RP2040 Game Boy Link Adapter
 
-## TL;DR
+This firmware turns an RP2040 into a USB-to-Game Boy Link Cable adapter supporting both **Game Boy (Gen 1/2)** and **Game Boy Advance** communication over WebUSB.
 
-This firmware is required to build a **GB-Link Device**.
+This is originally forked from Celio Firmware from the CelioLink project and adds the functionality from GBLink Reconfigurable to allow for Tetris, Pokemon gen1-3 trading. Sending multiboot files to GBA, GB Printer emulator, as well as the Celio Gen3 modes for direct gen3 GBA link.
 
-- The latest firmware revision can be found under **Releases**.
-- Currently, only the **Raspberry Pi RP2040** is supported.
+## Quick Start
 
 Web flash/update
 https://launcher.gblink.io
@@ -16,11 +15,9 @@ Manual update
 3. Connect the device to your computer.
 4. Drag and drop the `.uf2` file onto the mounted drive.
 
-To flash the RP2040:
+---
 
-1. Hold the **BOOTSEL** button.
-2. Connect the device to your computer.
-3. Drag and drop the firmware `.uf2` file onto the mounted device.
+## Supported Modes
 
 | Mode | Command | Description |
 |:---|:---|:---|
@@ -32,7 +29,9 @@ To flash the RP2040:
 
 ---
 
-## Game Boy Advance Connectivity
+## Hardware Required
+
+* **USB Adapter Board:** Raspberry Pi Pico or Waveshare RP2040-Zero, Solderless board in development. Pre built DIY adapter or kits are avalible on Etsy. https://www.etsy.com/listing/1517956485/gb-link-usb-to-gameboy-link-adapter-for 
 
 Existing open source PCB designs
 
@@ -42,85 +41,63 @@ Pico Zero PCB: https://github.com/weimanc/game-boy-zero-link-board
 
 ### Wiring Guide
 
-- smashstacking's GBA to USB Adapter  
-  https://www.youtube.com/watch?v=KtHu693wE9o  
+The firmware uses the RP2040 PIO to communicate with the Game Boy. Connect the Link Cable wires as follows:
 
-You have several hardware options:
+| Game Boy Signal | RP2040 Pin |
+|:---|:---|
+| **SCK** (Clock) | **GP0** |
+| **SIN** (Data In) | **GP1** |
+| **SOUT** (Data Out) | **GP2** |
+| **SD** (Chip Select) | **GP3** (GBA cable) / **GP4** (GBC cable) |
+| **GND** | **Ground** |
 
-- Order a PCB from JLCPCB (or another PCB manufacturer):  
-  https://github.com/agtbaskara/game-boy-pico-link-board
+Additional hardware pins:
 
-- Buy a prebuilt board from Etsy (not affiliated):  
-  https://www.etsy.com/de/listing/1517956485/gb-link-usb-zu-gameboy-link-adapter-fur
-
----
-
-## Link Cable Requirements
-
-This firmware has only been tested with **original Nintendo GBA Link Cables**.  
-Reproduction cables should work as well.
-
-⚠ Important: GBA link cable connectors are **not identical**.
-
-- Slim connector = **Master**
-- Wide connector = **Slave**
-
-The Celio-Device **must** be connected to the **master connector**.
+| **Voltage 3.3V** | **GP11** | Pull low for 3.3V 
+| **Voltage 5V** | **GP12** | Pull low for 5V
+| **WS2812 LED** | **GP16** | NeoPixel status indicator
 
 ---
 
-# Overview
+## LED Status Indicators
 
-This repository contains the firmware source code for the Celio-Device.
+The onboard WS2812 RGB LED (GP16) indicates the current status:
 
-The firmware allows the device to connect to a Game Boy Advance as either:
+| Color | Status |
+|:---|:---|
+| **Red** | Power — Device powered, no data connection |
+| **Green** | Connected — USB connected to host |
+| **Yellow** | GBA Mode — Game Boy Advance link active |
+| **Blue** | GB/GBC Mode — Game Boy or Game Boy Color link active |
+| **Purple** | Printer Mode — GB Printer emulation active |
 
-- **Master** (Link Cable pinout default)
-- **Slave** (by pulling SO up)
-
-This makes it possible to implement the Pokémon Generation 3 Link Trading Protocol    
-and perform trades or battles using real hardware.
-
-For online connectivity, one system assumes the role of the master while the partner system acts as the slave.    
-During synchronization, both sides keep the in-game trade session in an idle state until    
-packets from the remote partner arrive. The firmware forwards and injects link data in real time,    
-effectively allowing two physically separate Game Boy Advance systems to behave as if they were    
-connected by a direct link cable.
-
-In this setup, a Celio-Device act as a “dummy” Game Boy Advance. It injects packets into the ongoing trade while   
-simultaneously capturing packets from its connected console and forwarding them to the remote partner.    
-This packet-level bridging enables stable online trades and battles on original hardware.
+LED color can also be set via USB command (`0x42`).
 
 ---
 
-# Design
+## Link Cable Compatibility
 
-The project is primarily written in **C++**.
+The firmware automatically detects which cable type is connected at mode selection time.
 
-While it avoids many advanced language features, it heavily relies on:
+| Cable Type | Supported Modes | Notes |
+|:---|:---|:---|
+| **OEM GBA Link Cable** | GBA modes only | SD on GP3. |
+| **Generic GBC Link Cable** | All GBA and GB modes | All 6 pins wired through. SD routes to GP4 in GBA mode. Auto-detected. |
 
-- **RAII patterns** for safe state management
-- Scoped objects to ensure proper cleanup of link session components
+**GBA link cable connectors are not identical: Cheap 3rd party GBA cables missing the hub typically only have 4 conductors and are missing a ground which results in a poor connection.**
 
-This makes it easier to manage complex state transitions during link sessions
-without leaving components in undefined states.
+- **Slim** connector = **Master**
+- **Wide** connector = **Slave**
+
+The device **must** be connected to the **master connector** for GBA modes.
+
+> **Tip:** Connect the cable to the adapter before selecting a GBA mode in the web app. The firmware detects the cable type at mode selection time.
 
 ---
 
-## Zephyr RTOS
+## USB Command Protocol
 
-This project uses **Zephyr RTOS**:
-
-https://www.zephyrproject.org/
-
-Originally, the target MCU was an STM32F07.  
-Thanks to Zephyr, migrating to the RP2040 required only minimal to moderate effort.
-
-Zephyr provides most low-level abstractions.  
-The only MCU-specific implementation resides in: ```/src/layers/linkLayer_.c```   
-This file implements the low-level bit-layer handling of the link protocol.
-
-To port this project to another MCU:
+Commands are sent over the WebUSB command endpoint:
 
 | Range | Module | Commands |
 |:---|:---|:---|
@@ -138,11 +115,7 @@ To port this project to another MCU:
 
 ---
 
-# Known Issues
-
-In rare cases, the firmware may not respond to a mode-switch command.
-
-If this happens, reconnect the device.
+## Troubleshooting
 
 - When refreshing the web page, the USB device may need to be reset (unplug or press reset button).
 - On Linux, run `./scripts/setup-permissions.sh` once to install udev rules so the browser can access the adapter without sudo (covers both WebUSB and WebSerial).
