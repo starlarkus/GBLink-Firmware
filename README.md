@@ -25,7 +25,7 @@ Manual update
 | **GBA Link** | `0x01` | Bridge two GBA systems over the internet |
 | **GB Link** | `0x02` | SPI passthrough for Game Boy |
 | **GB Printer** | `0x03` | Game Boy Printer emulation (bit-bang SPI slave) |
-| **GBA Advance Wars** | `0x04` | Advance Wars, Sill WIP |
+| **GBA Advance Wars** | `0x04` | Advance Wars 1 + 2 |
 
 ---
 
